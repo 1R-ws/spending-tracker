@@ -4,12 +4,14 @@ import { db, auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import { categorizeExpense } from '../utils/gemini'
 
 const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Health', 'Entertainment', 'Other']
 
 function AddExpense() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [form, setForm] = useState({
     amount: '',
@@ -19,6 +21,22 @@ function AddExpense() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  const handleAICategorize = async () => {
+    if (!form.note) {
+      alert('Please enter a note first so AI can categorize it.')
+      return
+    }
+    setAiLoading(true)
+    const category = await categorizeExpense(form.note, form.amount)
+    if (category) {
+      setForm({ ...form, category })
+      alert(`AI detected category: ${category} ✅`)
+    } else {
+      alert('AI could not categorize. Please select manually.')
+    }
+    setAiLoading(false)
   }
 
   const handleSubmit = async () => {
@@ -65,6 +83,29 @@ function AddExpense() {
         </div>
 
         <div className="form-group">
+          <label>Note (optional)</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              name="note"
+              placeholder="e.g. lunch at mamak"
+              value={form.note}
+              onChange={handleChange}
+              style={{ flex: 1 }}
+            />
+            <button
+              className="ai-btn"
+              onClick={handleAICategorize}
+              disabled={aiLoading}
+              title="Let AI detect category"
+            >
+              {aiLoading ? '...' : '🤖 AI'}
+            </button>
+          </div>
+          <small className="ai-hint">Type a note then click 🤖 AI to auto detect category</small>
+        </div>
+
+        <div className="form-group">
           <label>Category</label>
           <select name="category" value={form.category} onChange={handleChange}>
             {CATEGORIES.map(cat => (
@@ -80,22 +121,10 @@ function AddExpense() {
             onChange={(date) => setSelectedDate(date)}
             dateFormat="dd/MM/yyyy"
             className="datepicker-input"
-            calendarClassName="custom-calendar"
             showMonthDropdown
             showYearDropdown
             dropdownMode="select"
             maxDate={new Date()}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Note (optional)</label>
-          <input
-            type="text"
-            name="note"
-            placeholder="e.g. lunch at mamak"
-            value={form.note}
-            onChange={handleChange}
           />
         </div>
 

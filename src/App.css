@@ -492,3 +492,31 @@ body {
 .react-datepicker-wrapper {
   width: 100%;
 }
+
+.ai-btn {
+  padding: 10px 14px;
+  background: #764ba2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .2s;
+}
+
+.ai-btn:hover {
+  background: #5a3880;
+}
+
+.ai-btn:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+
+.ai-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+  display: block;
+}
