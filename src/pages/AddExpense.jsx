@@ -6,7 +6,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { categorizeExpense } from '../utils/gemini'
 
-import { CATEGORIES, COLORS } from '../constants/categories'
+import { CATEGORIES, COLORS, CATEGORY_ICONS } from '../constants/categories'
 
 function AddExpense() {
   const navigate = useNavigate()
@@ -52,7 +52,7 @@ function AddExpense() {
         category: form.category,
         date: selectedDate.toISOString().slice(0, 10),
         note: form.note,
-        uid: auth.currentUser.uid,
+        uid: auth.currentUser?.uid,
         createdAt: serverTimestamp()
       })
       alert('Expense added successfully!')
@@ -109,7 +109,7 @@ function AddExpense() {
           <label>Category</label>
           <select name="category" value={form.category} onChange={handleChange}>
             {CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+              <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat}</option>
             ))}
           </select>
         </div>

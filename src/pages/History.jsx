@@ -9,7 +9,7 @@ import { db } from '../firebase/config'
 
 import {
   CATEGORIES,
-  COLORS
+  CATEGORY_ICONS
 } from '../constants/categories'
 
 import { useExpenses } from '../hooks/useExpenses'
@@ -29,13 +29,27 @@ function History() {
 
   const handleDelete = async (id) => {
 
-    if (!confirm('Delete this expense?')) {
+    const confirmed = window.confirm(
+      'Delete this expense?'
+    )
+
+    if (!confirmed) {
       return
     }
 
-    await deleteDoc(
-      doc(db, 'expenses', id)
-    )
+    try {
+
+      await deleteDoc(
+        doc(db, 'expenses', id)
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert('Failed to delete expense.')
+
+    }
 
   }
 
@@ -82,13 +96,12 @@ function History() {
       encodeURIComponent(csv)
 
     a.download =
-      `spending-${filterMonth}.csv`
+      `spending-${filterMonth || 'all'}.csv`
 
     a.click()
 
   }
 
-  // Build month options
   const months = Array.from(
     { length: 6 },
     (_, i) => {
@@ -105,11 +118,13 @@ function History() {
   )
 
   if (loading) {
+
     return (
       <div className="loading">
         Loading...
       </div>
     )
+
   }
 
   return (
@@ -117,7 +132,7 @@ function History() {
     <div className="page-container">
 
       <h2 className="page-title">
-        History
+        📜 History
       </h2>
 
       {/* Filters */}
@@ -166,7 +181,7 @@ function History() {
         >
 
           <option value="All">
-            All
+            📂 All
           </option>
 
           {CATEGORIES.map(cat => (
@@ -176,7 +191,7 @@ function History() {
               value={cat}
             >
 
-              {cat}
+              {CATEGORY_ICONS[cat]} {cat}
 
             </option>
 
@@ -211,17 +226,11 @@ function History() {
               className="expense-item"
             >
 
-              <span
-                className="cat-dot"
-                style={{
-                  background:
-                    COLORS[e.category]
-                }}
-              ></span>
-
               <div className="expense-info">
 
                 <div className="expense-name">
+
+                  {CATEGORY_ICONS[e.category]}{' '}
 
                   {e.note || e.category}
 
@@ -237,7 +246,7 @@ function History() {
 
               <span className="expense-amount">
 
-                RM {e.amount?.toFixed(2)}
+                RM {Number(e.amount || 0).toFixed(2)}
 
               </span>
 
@@ -261,6 +270,7 @@ function History() {
     </div>
 
   )
+
 }
 
 export default History

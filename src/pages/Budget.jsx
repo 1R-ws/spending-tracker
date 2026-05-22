@@ -10,7 +10,8 @@ import { db, auth } from '../firebase/config'
 
 import {
   CATEGORIES,
-  COLORS
+  COLORS,
+  CATEGORY_ICONS
 } from '../constants/categories'
 
 import { useExpenses } from '../hooks/useExpenses'
@@ -29,25 +30,35 @@ function Budget() {
     .toISOString()
     .slice(0, 7)
 
-  // Load budgets from Firestore
+  // Load budgets
   useEffect(() => {
 
     const loadBudgets = async () => {
 
-      if (!auth.currentUser) return
+      try {
 
-      const ref = doc(
-        db,
-        'budgets',
-        auth.currentUser.uid
-      )
+        if (!auth.currentUser) {
+          return
+        }
 
-      const snap = await getDoc(ref)
+        const ref = doc(
+          db,
+          'budgets',
+          auth.currentUser.uid
+        )
 
-      if (snap.exists()) {
+        const snap = await getDoc(ref)
 
-        setBudgets(snap.data())
-        setInputs(snap.data())
+        if (snap.exists()) {
+
+          setBudgets(snap.data())
+          setInputs(snap.data())
+
+        }
+
+      } catch (error) {
+
+        console.error(error)
 
       }
 
@@ -57,35 +68,56 @@ function Budget() {
 
   }, [])
 
+  // Save budget
   const handleSave = async (cat) => {
 
-    const val = parseFloat(inputs[cat])
+    try {
 
-    if (!val || val <= 0) {
+      const val = parseFloat(inputs[cat])
 
-      alert('Please enter a valid amount.')
-      return
+      if (isNaN(val) || val <= 0) {
+
+        alert('Please enter a valid amount.')
+        return
+
+      }
+
+      const updated = {
+        ...budgets,
+        [cat]: val
+      }
+
+      setBudgets(updated)
+
+      await setDoc(
+        doc(
+          db,
+          'budgets',
+          auth.currentUser.uid
+        ),
+        updated
+      )
+
+      alert(`${cat} budget saved!`)
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert('Failed to save budget.')
 
     }
-
-    const updated = {
-      ...budgets,
-      [cat]: val
-    }
-
-    setBudgets(updated)
-
-    await setDoc(
-      doc(db, 'budgets', auth.currentUser.uid),
-      updated
-    )
-
-    alert(`${cat} budget saved!`)
 
   }
 
   if (loading) {
-    return <div className="loading">Loading...</div>
+
+    return (
+      <div className="loading">
+        Loading...
+      </div>
+    )
+
   }
 
   const thisMonthExp = expenses.filter(
@@ -97,7 +129,7 @@ function Budget() {
     <div className="page-container">
 
       <h2 className="page-title">
-        Budget
+        💰 Budget
       </h2>
 
       {/* Set Budget */}
@@ -120,11 +152,12 @@ function Budget() {
             <span className="budget-cat-label">
 
               <span
-                className="cat-dot"
                 style={{
-                  background: COLORS[cat]
+                  fontSize: '18px'
                 }}
-              ></span>
+              >
+                {CATEGORY_ICONS[cat]}
+              </span>
 
               {cat}
 
@@ -162,7 +195,7 @@ function Budget() {
 
         <h3 className="chart-title">
 
-          Progress — {
+          Progress • {
 
             new Date().toLocaleString(
               'default',
@@ -180,22 +213,31 @@ function Budget() {
 
           const spent = thisMonthExp
             .filter(e => e.category === cat)
-            .reduce((s, e) => s + e.amount, 0)
+            .reduce(
+              (s, e) => s + Number(e.amount || 0),
+              0
+            )
 
-          const limit = budgets[cat] || 0
+          const limit = Number(
+            budgets[cat] || 0
+          )
 
           const pct = limit > 0
-            ? Math.min((spent / limit) * 100, 100)
+            ? Math.min(
+                (spent / limit) * 100,
+                100
+              )
             : 0
 
           const over =
-            limit > 0 && spent > limit
+            limit > 0 &&
+            spent > limit
 
           const color = over
             ? '#E24B4A'
             : pct > 70
               ? '#EF9F27'
-              : '#1D9E75'
+              : COLORS[cat]
 
           return (
 
@@ -210,16 +252,17 @@ function Budget() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6
+                    gap: 8
                   }}
                 >
 
                   <span
-                    className="cat-dot"
                     style={{
-                      background: COLORS[cat]
+                      fontSize: '18px'
                     }}
-                  ></span>
+                  >
+                    {CATEGORY_ICONS[cat]}
+                  </span>
 
                   {cat}
 
@@ -239,14 +282,16 @@ function Budget() {
 
                     {limit > 0
                       ? ` / RM ${limit.toFixed(2)}`
-                      : ' (no limit)'}
+                      : ' (No limit)'}
 
                   </span>
 
                   {over && (
+
                     <span className="badge-over">
                       Over!
                     </span>
+
                   )}
 
                 </span>
@@ -280,6 +325,7 @@ function Budget() {
     </div>
 
   )
+
 }
 
 export default Budget
