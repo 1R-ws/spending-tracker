@@ -538,3 +538,11 @@ body {
   }
 
 }
+
+@media (max-width: 640px) {
+
+  .metric-row {
+    grid-template-columns: 1fr;
+  }
+
+}
