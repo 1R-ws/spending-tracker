@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, query, where, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore'
 import { db, auth } from '../firebase/config'
 
-const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Health', 'Entertainment', 'Other']
-const COLORS = { Food:'#1D9E75', Transport:'#378ADD', Shopping:'#D4537E', Bills:'#BA7517', Health:'#7F77DD', Entertainment:'#D85A30', Other:'#888780' }
+import { CATEGORIES, COLORS } from '../constants/categories'
 
 function Budget() {
   const [expenses, setExpenses] = useState([])

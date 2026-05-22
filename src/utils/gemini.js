@@ -1,8 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(
-  import.meta.env.VITE_GEMINI_API_KEY
-)
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY)
 
 const CATEGORIES = [
   'Food',
@@ -14,143 +12,93 @@ const CATEGORIES = [
   'Other'
 ]
 
-// Local merchant keywords
+// Keyword matching first
 const KEYWORDS = {
   Food: [
-    'mcd',
-    'mcdonald',
-    'tealive',
-    'starbucks',
-    'kfc',
-    'grabfood',
-    'nasi',
-    'restaurant',
-    'mamak'
+  'mcd', 'kfc', 'burger', 'pizza', 'nasi',
+  'ayam', 'mamak', 'tealive', 'starbucks',
+  'coffee', 'lunch', 'dinner', 'breakfast',
+  'grabfood', 'foodpanda',
+  'mixue', 'familymart', '99 speedmart'
   ],
 
   Transport: [
-    'grab',
-    'tng',
-    'petronas',
-    'shell',
-    'parking',
-    'tol'
-  ],
-
-  Bills: [
-    'tnb',
-    'unifi',
-    'maxis',
-    'celcom',
-    'wifi'
-  ],
-
-  Health: [
-    'clinic',
-    'hospital',
-    'panadol',
-    'guardian',
-    'watson'
-  ],
-
-  Entertainment: [
-    'netflix',
-    'spotify',
-    'steam',
-    'movie'
+    'grab', 'lrt', 'mrt', 'tng', 'petrol',
+    'fuel', 'parking', 'toll', 'bus'
   ],
 
   Shopping: [
-    'shopee',
-    'lazada',
-    'nike',
-    'uniqlo'
+    'shopee', 'lazada', 'nike', 'adidas',
+    'shirt', 'shoe', 'keyboard', 'mouse'
+  ],
+
+  Bills: [
+    'tnb', 'electric', 'water', 'wifi',
+    'internet', 'maxis', 'celcom', 'unifi'
+  ],
+
+  Health: [
+    'clinic', 'hospital', 'panadol',
+    'medicine', 'pharmacy', 'guardian', 'watsons'
+  ],
+
+  Entertainment: [
+    'netflix', 'spotify', 'steam',
+    'game', 'movie', 'cinema', 'youtube'
   ]
 }
 
-// Keyword matcher
-function keywordCategorize(note) {
-
-  const text = note.toLowerCase()
-
-  for (const category in KEYWORDS) {
-
-    const found = KEYWORDS[category]
-      .some(keyword => text.includes(keyword))
-
-    if (found) {
-      return category
-    }
-  }
-
-  return null
-}
-
 export async function categorizeExpense(note, amount) {
-
   try {
+    const lowerNote = (note || '').toLowerCase()
 
-    // 1. Try keyword system first
-    const keywordCategory = keywordCategorize(note)
+    // 1. Keyword matching first
+    for (const category in KEYWORDS) {
+      const matched = KEYWORDS[category].some(keyword =>
+        lowerNote.includes(keyword)
+      )
 
-    if (keywordCategory) {
-      return keywordCategory
+      if (matched) {
+        return category
+      }
     }
 
-    // 2. AI fallback
+    // 2. Fallback to Gemini AI
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash'
+      model: 'gemini-1.5-flash'
     })
 
     const prompt = `
-You are a Malaysian expense categorizer.
+You are a spending categorizer.
 
-Choose ONLY ONE category:
+Return ONLY one category from:
 ${CATEGORIES.join(', ')}
 
-Rules:
-- Food = restaurant, drinks, groceries
-- Transport = grab, fuel, parking, toll
-- Bills = utilities, internet, phone bill
-- Shopping = online shopping, clothes
-- Health = medicine, clinic
-- Entertainment = movies, games, subscriptions
-- Other = unclear transaction
+Expense note: "${note}"
+Amount: RM ${amount}
 
-Transaction:
-"${note}"
-
-Amount:
-RM ${amount}
-
-Reply ONLY with category name.
+Reply ONLY category name.
 `
 
     const result = await model.generateContent(prompt)
 
-    let text = result.response.text().trim()
-
-    // Cleanup AI response
-    text = text
-      .replace('.', '')
-      .replace('"', '')
+    const text = result.response
+      .text()
       .trim()
+      .replace(/[^\w\s]/g, '')
 
-    // Normalize capitalization
-    text =
+    const normalized =
       text.charAt(0).toUpperCase() +
       text.slice(1).toLowerCase()
 
-    if (CATEGORIES.includes(text)) {
-      return text
+    if (CATEGORIES.includes(normalized)) {
+      return normalized
     }
 
     return 'Other'
 
   } catch (error) {
-
     console.error('Gemini error:', error)
-
     return 'Other'
   }
 }

@@ -1,0 +1,85 @@
+.form-group {
+  margin-bottom: 1.2rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background: white;
+  outline: none;
+  transition: border .2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #667eea;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.btn-primary:hover {
+  background: #5a6fd6;
+}
+
+.btn-primary:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+
+.datepicker-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background: white;
+  outline: none;
+  cursor: pointer;
+}
+
+.ai-btn {
+  padding: 10px 14px;
+  background: #764ba2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-btn:hover {
+  background: #5a3880;
+}
+
+.ai-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+  display: block;
+}

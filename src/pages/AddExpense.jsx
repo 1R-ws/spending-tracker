@@ -6,7 +6,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { categorizeExpense } from '../utils/gemini'
 
-const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Health', 'Entertainment', 'Other']
+import { CATEGORIES, COLORS } from '../constants/categories'
 
 function AddExpense() {
   const navigate = useNavigate()

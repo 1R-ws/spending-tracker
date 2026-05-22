@@ -1,0 +1,72 @@
+.budget-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.budget-cat-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.budget-input-row input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.save-btn {
+  padding: 8px 14px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.budget-progress-item {
+  margin-bottom: 16px;
+}
+
+.budget-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+.budget-amounts {
+  font-size: 12px;
+  color: #888;
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .3s;
+}
+
+.badge-over {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #FCEBEB;
+  color: #A32D2D;
+  font-weight: 500;
+}

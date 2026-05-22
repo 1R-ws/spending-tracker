@@ -1,0 +1,34 @@
+@media (max-width: 768px) {
+
+  .navbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+}
+
+@media (max-width: 640px) {
+
+  .metric-row {
+    grid-template-columns: 1fr;
+  }
+
+  .budget-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+}
