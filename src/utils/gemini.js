@@ -42,7 +42,7 @@ const KEYWORDS = {
     'parking', 'toll', 'grab',
     'lrt', 'mrt', 'bus', 'taxi',
     'touch n go', 'tng', 'rapidkl',
-    'ewallet reload', 'smart tag'
+    'ewallet reload', 'smart tag', 'minyak', 
   ],
 
   Shopping: [
