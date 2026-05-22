@@ -32,7 +32,7 @@ function AddExpense() {
     const category = await categorizeExpense(form.note, form.amount)
     if (category) {
       setForm({ ...form, category })
-      alert(`AI detected category: ${category} ✅`)
+      setAiMessage(`AI detected: ${category}`)
     } else {
       alert('AI could not categorize. Please select manually.')
     }
