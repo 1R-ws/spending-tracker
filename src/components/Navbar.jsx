@@ -1,20 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { auth } from '../firebase/config'
 import { signOut } from 'firebase/auth'
 
 function Navbar() {
 
-  const [open, setOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [dark, setDark] = useState(false)
 
-  const toggleMenu = () => {
-    setOpen(!open)
-  }
+  useEffect(() => {
+    const saved = localStorage.getItem('dark')
+    if (saved === 'true') {
+      setDark(true)
+      document.body.classList.add('dark')
+    }
+  }, [])
 
   const toggleDark = () => {
-    setDark(!dark)
-    document.body.classList.toggle('dark')
+    const newVal = !dark
+    setDark(newVal)
+    localStorage.setItem('dark', newVal)
+
+    if (newVal) {
+      document.body.classList.add('dark')
+    } else {
+      document.body.classList.remove('dark')
+    }
   }
 
   const logout = async () => {
@@ -22,43 +33,30 @@ function Navbar() {
   }
 
   return (
-    <div className="topbar">
+    <>
 
-      {/* TOP BAR */}
-      <div className="topbar-header">
+      {/* TOP BAR (settings only) */}
+      <div className="topbar">
 
         <div className="brand">
           💰 ExpenseApp
         </div>
 
-        <button className="menu-btn" onClick={toggleMenu}>
+        <button
+          className="menu-btn"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
           ☰
         </button>
 
       </div>
 
-      {/* DROPDOWN MENU */}
-      {open && (
-        <div className="menu-dropdown">
-
-          <NavLink to="/dashboard" onClick={() => setOpen(false)}>
-            🏠 Dashboard
-          </NavLink>
-
-          <NavLink to="/add" onClick={() => setOpen(false)}>
-            ➕ Add Expense
-          </NavLink>
-
-          <NavLink to="/history" onClick={() => setOpen(false)}>
-            📜 History
-          </NavLink>
-
-          <NavLink to="/budget" onClick={() => setOpen(false)}>
-            💰 Budget
-          </NavLink>
+      {/* SETTINGS PANEL */}
+      {menuOpen && (
+        <div className="settings-panel">
 
           <button onClick={toggleDark}>
-            ☀️ Dark Mode
+            {dark ? '☀️ Light Mode' : '🌙 Dark Mode'}
           </button>
 
           <button onClick={logout} className="logout">
@@ -68,7 +66,31 @@ function Navbar() {
         </div>
       )}
 
-    </div>
+      {/* BOTTOM NAV */}
+      <div className="bottom-nav">
+
+        <NavLink to="/dashboard" className="nav-item">
+          🏠
+          <span>Home</span>
+        </NavLink>
+
+        <NavLink to="/add" className="nav-item add-btn">
+          ➕
+        </NavLink>
+
+        <NavLink to="/history" className="nav-item">
+          📜
+          <span>History</span>
+        </NavLink>
+
+        <NavLink to="/budget" className="nav-item">
+          💰
+          <span>Budget</span>
+        </NavLink>
+
+      </div>
+
+    </>
   )
 }
 
