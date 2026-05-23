@@ -1,81 +1,31 @@
-import {
-  NavLink
-} from 'react-router-dom'
-
-import {
-  signOut
-} from 'firebase/auth'
-
-import {
-  auth
-} from '../firebase/config'
-
-import {
-  useTheme
-} from '../context/ThemeContext'
+import { NavLink } from 'react-router-dom'
 
 function Navbar() {
-
-  const {
-    darkMode,
-    toggleDarkMode
-  } = useTheme()
-
   return (
+    <div className="bottom-nav">
 
-    <nav className="navbar">
+      <NavLink to="/dashboard" className="nav-item">
+        🏠
+        <span>Dashboard</span>
+      </NavLink>
 
-      <div className="nav-brand">
-        💰 Spending Tracker
-      </div>
+      <NavLink to="/add" className="nav-item">
+        ➕
+        <span>Add</span>
+      </NavLink>
 
-      <div className="nav-links">
+      <NavLink to="/history" className="nav-item">
+        📜
+        <span>History</span>
+      </NavLink>
 
-        <NavLink to="/">
-          🏠 Dashboard
-        </NavLink>
+      <NavLink to="/budget" className="nav-item">
+        💰
+        <span>Budget</span>
+      </NavLink>
 
-        <NavLink to="/add">
-          ➕ Add
-        </NavLink>
-
-        <NavLink to="/history">
-          📜 History
-        </NavLink>
-
-        <NavLink to="/budget">
-          💰 Budget
-        </NavLink>
-
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: '10px'
-        }}
-      >
-
-        <button
-          className="theme-btn"
-          onClick={toggleDarkMode}
-        >
-          {darkMode ? '☀️' : '🌙'}
-        </button>
-
-        <button
-          className="logout-btn"
-          onClick={() => signOut(auth)}
-        >
-          Logout
-        </button>
-
-      </div>
-
-    </nav>
-
+    </div>
   )
-
 }
 
 export default Navbar
