@@ -197,11 +197,10 @@ Examples:
       .trim()
       .replace(/[^\w\s]/g, '')
 
-    const normalized =
-      text.charAt(0).toUpperCase() +
-      text.slice(1).toLowerCase()
-
-    if (CATEGORIES.includes(normalized)) {
+    const normalized = CATEGORIES.find(
+      c => c.toLowerCase() === text.toLowerCase()
+    )
+    if (normalized) {
       return normalized
     }
 
