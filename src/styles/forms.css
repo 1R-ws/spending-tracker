@@ -1,85 +1,100 @@
 .form-group {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.4rem;
 }
 
 .form-group label {
   display: block;
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 6px;
-  font-weight: 500;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
+/* Inputs */
 .form-group input,
-.form-group select {
+.form-group select,
+.datepicker-input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  padding: 14px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
   font-size: 14px;
-  color: #333;
-  background: white;
+  color: #111827;
+  background: #ffffff;
   outline: none;
-  transition: border .2s;
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus,
-.form-group select:focus {
-  border-color: #667eea;
+.form-group select:focus,
+.datepicker-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
 }
 
+/* Primary Button */
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  background: #667eea;
+  padding: 14px;
+  background: linear-gradient(
+    135deg,
+    #6366f1,
+    #8b5cf6
+  );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background .2s;
+  transition: all 0.2s ease;
+  box-shadow:
+    0 10px 20px
+    rgba(99, 102, 241, 0.25);
 }
 
 .btn-primary:hover {
-  background: #5a6fd6;
+  transform: translateY(-2px);
+  opacity: 0.95;
 }
 
 .btn-primary:disabled {
-  background: #aaa;
+  background: #cbd5e1;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
-.datepicker-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #333;
-  background: white;
-  outline: none;
-  cursor: pointer;
-}
-
+/* AI Button */
 .ai-btn {
-  padding: 10px 14px;
-  background: #764ba2;
+  padding: 12px 16px;
+  background: linear-gradient(
+    135deg,
+    #ec4899,
+    #8b5cf6
+  );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s ease;
+  box-shadow:
+    0 8px 18px
+    rgba(139, 92, 246, 0.25);
 }
 
 .ai-btn:hover {
-  background: #5a3880;
+  transform: translateY(-2px);
+  opacity: 0.95;
 }
 
+/* Hint */
 .ai-hint {
-  font-size: 11px;
-  color: #aaa;
-  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 6px;
   display: block;
+  line-height: 1.4;
 }

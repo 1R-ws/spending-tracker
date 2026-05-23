@@ -1,25 +1,19 @@
 @media (max-width: 768px) {
 
+  .metric-row {
+    grid-template-columns: 1fr;
+  }
+
   .navbar {
     flex-wrap: wrap;
-    height: auto;
-    padding: 1rem;
     gap: 1rem;
+    height: auto;
   }
 
   .nav-links {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-}
-
-@media (max-width: 640px) {
-
-  .metric-row {
-    grid-template-columns: 1fr;
   }
 
   .budget-input-row {
@@ -27,8 +21,12 @@
   }
 
   .expense-item {
-    flex-wrap: wrap;
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .expense-amount {
+    margin-top: 0.5rem;
   }
 
 }

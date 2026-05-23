@@ -1,14 +1,21 @@
+import { useEffect, useState } from 'react'
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
+} from 'firebase/firestore'
+
+import { db, auth } from '../firebase/config'
+
 import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
   ResponsiveContainer
 } from 'recharts'
+
+import { useNavigate } from 'react-router-dom'
 
 import {
   CATEGORIES,
@@ -16,37 +23,68 @@ import {
   CATEGORY_ICONS
 } from '../constants/categories'
 
-import { useExpenses } from '../hooks/useExpenses'
-
 function Dashboard() {
 
-  const { expenses, loading } = useExpenses()
+  const [expenses, setExpenses] = useState([])
 
-  const thisMonth = new Date()
-    .toISOString()
-    .slice(0, 7)
-
-  if (loading) {
-
-    return (
-      <div className="loading">
-        Loading...
-      </div>
-    )
-
-  }
-
-  const thisMonthExp = expenses.filter(
-    e => e.date?.startsWith(thisMonth)
+  const [activeMonth, setActiveMonth] = useState(
+    new Date().getMonth()
   )
 
-  const total = thisMonthExp.reduce(
+  const navigate = useNavigate()
+
+  const months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC'
+  ]
+
+  useEffect(() => {
+
+    if (!auth.currentUser) return
+
+    const q = query(
+      collection(db, 'expenses'),
+      where('uid', '==', auth.currentUser.uid)
+    )
+
+    const unsub = onSnapshot(q, (snapshot) => {
+
+      setExpenses(
+        snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+      )
+
+    })
+
+    return () => unsub()
+
+  }, [])
+
+  const year = new Date().getFullYear()
+
+  const monthKey =
+    `${year}-${String(activeMonth + 1).padStart(2, '0')}`
+
+  const monthExp = expenses.filter(
+    e => e.date?.startsWith(monthKey)
+  )
+
+  const total = monthExp.reduce(
     (s, e) => s + Number(e.amount || 0),
     0
   )
-
-  const dailyAvg =
-    total / new Date().getDate()
 
   // Pie chart data
   const pieData = CATEGORIES
@@ -55,13 +93,12 @@ function Dashboard() {
 
       name: cat,
 
-      value: thisMonthExp
+      value: monthExp
 
         .filter(e => e.category === cat)
 
         .reduce(
-          (s, e) =>
-            s + Number(e.amount || 0),
+          (s, e) => s + Number(e.amount || 0),
           0
         )
 
@@ -69,225 +106,269 @@ function Dashboard() {
 
     .filter(d => d.value > 0)
 
-  // Bar chart data
-  const barData = Array.from(
-    { length: 6 },
-    (_, i) => {
+    .sort((a, b) => b.value - a.value)
 
-      const d = new Date()
+  // Category summary
+  const topCats = [...pieData]
 
-      d.setMonth(
-        d.getMonth() - (5 - i)
-      )
+  // Recent expenses
+  const recentExp = [...monthExp]
 
-      const key = d
-        .toISOString()
-        .slice(0, 7)
+    .sort((a, b) =>
+      b.date?.localeCompare(a.date)
+    )
 
-      const label = d.toLocaleString(
-        'default',
-        {
-          month: 'short'
-        }
-      )
-
-      const total = expenses
-
-        .filter(e =>
-          e.date?.startsWith(key)
-        )
-
-        .reduce(
-          (s, e) =>
-            s + Number(e.amount || 0),
-          0
-        )
-
-      return {
-        month: label,
-        total
-      }
-
-    }
-  )
+    .slice(0, 5)
 
   return (
 
-    <div className="page-container">
+    <div className="dash-container">
 
-      <h2 className="page-title">
-        📊 Dashboard
-      </h2>
+      {/* Month Selector */}
+      <div className="month-scroll">
 
-      {/* Summary Cards */}
-      <div className="metric-row">
+        {months.map((m, i) => (
 
-        <div className="metric-card">
+          <button
+            key={m}
+            className={
+              `month-btn ${
+                activeMonth === i
+                  ? 'active'
+                  : ''
+              }`
+            }
+            onClick={() =>
+              setActiveMonth(i)
+            }
+          >
 
-          <div className="metric-label">
-            This Month
+            {m}
+
+          </button>
+
+        ))}
+
+      </div>
+
+      {/* Donut Chart */}
+      <div className="donut-wrap">
+
+        <ResponsiveContainer
+          width="100%"
+          height={240}
+        >
+
+          <PieChart>
+
+            <Pie
+              data={
+                pieData.length > 0
+                  ? pieData
+                  : [
+                      {
+                        name: 'Empty',
+                        value: 1
+                      }
+                    ]
+              }
+              dataKey="value"
+              cx="50%"
+              cy="50%"
+              innerRadius={75}
+              outerRadius={110}
+              strokeWidth={2}
+            >
+
+              {
+                pieData.length > 0
+
+                  ? pieData.map(entry => (
+
+                      <Cell
+                        key={entry.name}
+                        fill={
+                          COLORS[entry.name] ||
+                          '#999'
+                        }
+                      />
+
+                    ))
+
+                  : (
+                      <Cell fill="#f0f0f0" />
+                    )
+              }
+
+            </Pie>
+
+          </PieChart>
+
+        </ResponsiveContainer>
+
+        <div className="donut-center">
+
+          <div className="donut-label">
+            This month's spending
           </div>
 
-          <div className="metric-value">
+          <div className="donut-total">
             RM {total.toFixed(2)}
           </div>
 
         </div>
 
-        <div className="metric-card">
-
-          <div className="metric-label">
-            Transactions
-          </div>
-
-          <div className="metric-value">
-            {thisMonthExp.length}
-          </div>
-
-        </div>
-
-        <div className="metric-card">
-
-          <div className="metric-label">
-            Daily Avg
-          </div>
-
-          <div className="metric-value">
-            RM {dailyAvg.toFixed(2)}
-          </div>
-
-        </div>
-
       </div>
 
-      {/* Pie Chart */}
-      <div className="chart-card">
+      {/* Category Pills */}
+      <div className="cat-scroll">
 
-        <h3 className="chart-title">
-          Spending by Category
-        </h3>
-
-        {pieData.length === 0 ? (
+        {topCats.length === 0 ? (
 
           <div className="empty">
-            No expenses this month yet.
+            No expenses this month.
           </div>
 
         ) : (
 
-          <>
+          topCats.map(cat => (
 
-            <ResponsiveContainer
-              width="100%"
-              height={280}
+            <div
+              key={cat.name}
+              className="cat-pill"
             >
 
-              <PieChart>
+              <div
+                className="cat-pill-icon"
+                style={{
+                  background:
+                    (COLORS[cat.name] || '#999') + '22',
 
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  label={({ name, percent }) =>
-                    `${CATEGORY_ICONS[name]} ${(percent * 100).toFixed(0)}%`
-                  }
-                >
+                  color:
+                    COLORS[cat.name] || '#999'
+                }}
+              >
 
-                  {pieData.map(entry => (
+                {
+                  CATEGORY_ICONS[cat.name] || '📦'
+                }
 
-                    <Cell
-                      key={entry.name}
-                      fill={COLORS[entry.name]}
-                    />
+              </div>
 
-                  ))}
+              <div className="cat-pill-name">
 
-                </Pie>
+                {cat.name}
 
-                <Tooltip
-                  formatter={(value) =>
-                    `RM ${Number(value).toFixed(2)}`
-                  }
-                />
+              </div>
 
-              </PieChart>
+              <div className="cat-pill-amt">
 
-            </ResponsiveContainer>
+                RM {cat.value.toFixed(0)}
 
-            <div className="legend">
-
-              {pieData.map(d => (
-
-                <span
-                  key={d.name}
-                  className="legend-item"
-                >
-
-                  <span
-                    className="legend-dot"
-                    style={{
-                      background:
-                        COLORS[d.name]
-                    }}
-                  ></span>
-
-                  {CATEGORY_ICONS[d.name]}{' '}
-                  {d.name}
-
-                  {' '}— RM {d.value.toFixed(2)}
-
-                </span>
-
-              ))}
+              </div>
 
             </div>
 
-          </>
+          ))
 
         )}
 
       </div>
 
-      {/* Bar Chart */}
-      <div className="chart-card">
+      {/* Recent Transactions */}
+      <div className="recent-section">
 
-        <h3 className="chart-title">
-          Monthly Spending
-        </h3>
+        <div className="recent-header">
 
-        <ResponsiveContainer
-          width="100%"
-          height={220}
-        >
+          <span className="recent-title">
+            Recent
+          </span>
 
-          <BarChart data={barData}>
+          <button
+            className="see-all"
+            onClick={() =>
+              navigate('/history')
+            }
+          >
 
-            <XAxis dataKey="month" />
+            See all
 
-            <YAxis
-              tickFormatter={v => `RM${v}`}
-            />
+          </button>
 
-            <Tooltip
-              formatter={(value) =>
-                `RM ${Number(value).toFixed(2)}`
-              }
-            />
+        </div>
 
-            <Bar
-              dataKey="total"
-              fill="#667eea"
-              radius={[6, 6, 0, 0]}
-            />
+        {recentExp.length === 0 ? (
 
-          </BarChart>
+          <div className="empty">
+            No transactions yet.
+          </div>
 
-        </ResponsiveContainer>
+        ) : (
+
+          recentExp.map(e => (
+
+            <div
+              key={e.id}
+              className="recent-item"
+            >
+
+              <div
+                className="recent-icon"
+                style={{
+                  background:
+                    (COLORS[e.category] || '#999') + '22'
+                }}
+              >
+
+                <span>
+
+                  {
+                    CATEGORY_ICONS[e.category] || '📦'
+                  }
+
+                </span>
+
+              </div>
+
+              <div className="recent-info">
+
+                <div className="recent-name">
+
+                  {e.note || e.category}
+
+                </div>
+
+                <div className="recent-meta">
+
+                  {e.category} · {e.date}
+
+                </div>
+
+              </div>
+
+              <div className="recent-amount">
+
+                - RM {Number(e.amount || 0).toFixed(2)}
+
+              </div>
+
+            </div>
+
+          ))
+
+        )}
 
       </div>
+
+      {/* Add Button */}
+      <button
+        className="fab"
+        onClick={() => navigate('/add')}
+      >
+
+        + Add Expense
+
+      </button>
 
     </div>
 
