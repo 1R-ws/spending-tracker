@@ -1,211 +1,269 @@
 import Tesseract from 'tesseract.js'
-import { collection, query, where, getDocs } from 'firebase/firestore'
-import { db, auth } from '../firebase/config'
 
-/* =========================
-   LEARNING FUNCTION
-========================= */
-async function getLearnedCategory(keyword) {
+import { categorizeExpense } from './gemini'
 
-  if (!keyword || !auth.currentUser) return null
-
-  try {
-
-    const q = query(
-      collection(db, 'expenses'),
-      where('uid', '==', auth.currentUser.uid)
-    )
-
-    const snap = await getDocs(q)
-
-    const map = {}
-
-    snap.forEach(doc => {
-
-      const data = doc.data()
-      const note = (data.note || '').toUpperCase()
-      const cat = data.category
-
-      if (note.includes(keyword.toUpperCase())) {
-
-        map[cat] = (map[cat] || 0) + 1
-
-      }
-
-    })
-
-    let best = null
-    let max = 0
-
-    for (const cat in map) {
-
-      if (map[cat] > max) {
-        max = map[cat]
-        best = cat
-      }
-
-    }
-
-    return best
-
-  } catch (err) {
-
-    console.error('Learning error:', err)
-    return null
-
-  }
-
-}
-
-/* =========================
-   MAIN FUNCTION
-========================= */
 export async function scanReceipt(file) {
 
   try {
 
-    const { data: { text } } =
-      await Tesseract.recognize(file, 'eng')
+    const {
+      data: { text }
+    } = await Tesseract.recognize(
+      file,
+      'eng',
+      {
+        logger: m => console.log(m)
+      }
+    )
 
-    const cleanText = text
+    console.log('OCR TEXT:')
+    console.log(text)
+
+    // =========================
+    // CLEAN TEXT
+    // =========================
+
+    const clean = text
       .replace(/\n/g, ' ')
       .replace(/\s+/g, ' ')
-      .toUpperCase()
+      .trim()
 
-    /* =========================
-       AMOUNT
-    ========================= */
-    let amount = ''
+    console.log('CLEAN TEXT:', clean)
+
+    // =========================
+    // DETECT AMOUNT
+    // =========================
 
     const amountPatterns = [
-      /TOTAL AMOUNT\s*RM\s*([0-9]+\.[0-9]{2})/i,
-      /TOTAL\s*RM\s*([0-9]+\.[0-9]{2})/i,
-      /RM\s*([0-9]+\.[0-9]{2})/i
+
+      /total\s*amount\s*rm?\s*(\d+\.\d{2})/i,
+
+      /grand\s*total\s*rm?\s*(\d+\.\d{2})/i,
+
+      /amount\s*rm?\s*(\d+\.\d{2})/i,
+
+      /total\s*rm?\s*(\d+\.\d{2})/i,
+
+      /rm\s*(\d+\.\d{2})/i,
+
+      /(\d+\.\d{2})/
+
     ]
 
-    for (const p of amountPatterns) {
-      const m = cleanText.match(p)
-      if (m?.[1]) {
-        amount = m[1]
+    let amount = ''
+
+    for (const pattern of amountPatterns) {
+
+      const match = clean.match(pattern)
+
+      if (match) {
+
+        amount = match[1]
         break
+
       }
+
     }
 
-    /* =========================
-       DATE
-    ========================= */
+    // =========================
+    // DETECT DATE
+    // =========================
+
+    const datePatterns = [
+
+      /(\d{2}\/\d{2}\/\d{4})/,
+
+      /(\d{2}-\d{2}-\d{4})/,
+
+      /(\d{4}-\d{2}-\d{2})/
+
+    ]
+
     let date = ''
 
-    const d = cleanText.match(
-      /([0-9]{2}\/[0-9]{2}\/[0-9]{4})/
-    )
+    for (const pattern of datePatterns) {
 
-    if (d?.[1]) {
+      const match = clean.match(pattern)
 
-      const [dd, mm, yyyy] = d[1].split('/')
-      date = `${yyyy}-${mm}-${dd}`
+      if (match) {
 
-    }
-
-    /* =========================
-       NOTE (SHOP NAME)
-    ========================= */
-    let note = 'Receipt'
-
-    const lines = text.split('\n')
-
-    for (const line of lines) {
-
-      const up = line.toUpperCase()
-
-      if (
-        up.includes('ENTERPRISE') ||
-        up.includes('SDN') ||
-        up.includes('MOTOR') ||
-        up.includes('CAFE') ||
-        up.includes('SHOP')
-      ) {
-        note = line.trim()
+        date = match[1]
         break
+
       }
 
     }
 
-    /* =========================
-       CATEGORY (BASE RULE)
-    ========================= */
-    let category = 'General'
+    // =========================
+    // DETECT SHOP NAME
+    // =========================
 
-    const txt = cleanText
+    const lines = text
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+
+    let note = ''
+
+    const blacklist = [
+
+      'rm',
+      'cash',
+      'receipt',
+      'date',
+      'member',
+      'cashier',
+      'sales',
+      'total',
+      'qty',
+      'thank',
+      'signature',
+      'point',
+      'description',
+      'tel',
+      'refund',
+      'returnable'
+
+    ]
+
+    // prioritize business/company name
+    for (const line of lines) {
+
+      const lower = line.toLowerCase()
+
+      const isBlacklisted =
+        blacklist.some(word => lower.includes(word))
+
+      const hasNumber =
+        /\d/.test(line)
+
+      const looksLikeBusiness =
+        line.length > 8 &&
+        !hasNumber &&
+        !isBlacklisted
+
+      if (looksLikeBusiness) {
+
+        note = line
+        break
+
+      }
+
+    }
+
+    // fallback
+    if (!note) {
+
+      for (const line of lines) {
+
+        const lower = line.toLowerCase()
+
+        const isBad =
+          blacklist.some(word => lower.includes(word)) ||
+          line.length < 4
+
+        if (!isBad) {
+
+          note = line
+          break
+
+        }
+
+      }
+
+    }
+
+    // =========================
+    // FIX COMMON OCR MISTAKES
+    // =========================
+
+    const fixes = {
+
+      'TIAM niac MOTOR ENTERPRISE':
+        'TIAM MIAO MOTOR ENTERPRISE',
+
+      'Tian mac':
+        'TIAM MIAO MOTOR ENTERPRISE'
+
+    }
+
+    if (fixes[note]) {
+
+      note = fixes[note]
+
+    }
+
+    // =========================
+    // AI CATEGORY
+    // =========================
+
+    let category = 'Other'
+
+    try {
+
+      category = await categorizeExpense(
+        note,
+        amount
+      )
+
+    } catch (e) {
+
+      console.log(e)
+
+    }
+
+    // =========================
+    // AUTO CATEGORY FALLBACK
+    // =========================
+
+    const lowerNote = note.toLowerCase()
 
     if (
-      txt.includes('MCD') ||
-      txt.includes('KFC') ||
-      txt.includes('ZUS') ||
-      txt.includes('TEALIVE')
-    ) category = 'Food'
+      lowerNote.includes('motor') ||
+      lowerNote.includes('workshop') ||
+      lowerNote.includes('tyre') ||
+      lowerNote.includes('service') ||
+      lowerNote.includes('spare')
+    ) {
 
-    else if (
-      txt.includes('PETRONAS') ||
-      txt.includes('SHELL')
-    ) category = 'Fuel'
+      category = 'Maintenance'
 
-    else if (
-      txt.includes('SHOPEE') ||
-      txt.includes('AEON') ||
-      txt.includes('MR DIY')
-    ) category = 'Shopping'
-
-    else if (
-      txt.includes('GRAB') ||
-      txt.includes('TNG')
-    ) category = 'Transport'
-
-    else if (
-      txt.includes('WATSON') ||
-      txt.includes('PHARMACY')
-    ) category = 'Health'
-
-    else if (
-      txt.includes('MOTOR') ||
-      txt.includes('WORKSHOP')
-    ) category = 'Maintenance'
-
-    /* =========================
-       🧠 AI LEARNING LAYER
-    ========================= */
-
-    const learned = await getLearnedCategory(note)
-
-    if (learned) {
-      category = learned
     }
 
-    /* =========================
-       RESULT
-    ========================= */
+    // =========================
+    // FINAL DEBUG
+    // =========================
 
-    alert(
-`Receipt scanned successfully!
+    console.log('FINAL RESULT:', {
 
-Amount: ${amount || 'Not detected'}
-Category: ${category}
-Note: ${note || 'Not detected'}
-Date: ${date || 'Not detected'}`
-    )
+      amount,
+      date,
+      note,
+      category
+
+    })
 
     return {
+
       amount,
-      category,
+      date,
       note,
-      date
+      category
+
     }
 
-  } catch (err) {
+  } catch (error) {
 
-    console.error(err)
-    alert('Failed to scan receipt.')
-    return null
+    console.error(error)
+
+    return {
+
+      amount: '',
+      date: '',
+      note: '',
+      category: 'Other'
+
+    }
 
   }
 

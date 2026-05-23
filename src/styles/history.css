@@ -1,7 +1,6 @@
 /* =========================
-   HISTORY (DARK MODE FIX)
+   HISTORY FILTER
 ========================= */
-
 .filter-row {
   display: flex;
   gap: 8px;
@@ -13,27 +12,20 @@
   flex: 1;
   min-width: 120px;
   padding: 8px 12px;
-
   border: 1px solid var(--border);
   border-radius: 10px;
-
   font-size: 13px;
-
   background: var(--card);
   color: var(--text);
-
   outline: none;
 }
 
 .export-btn {
   padding: 8px 14px;
-
   border: 1px solid var(--border);
   border-radius: 10px;
-
   background: var(--card);
   color: var(--text);
-
   font-size: 13px;
   cursor: pointer;
 }
@@ -42,24 +34,16 @@
   background: rgba(127,127,127,0.1);
 }
 
-/* ===== CARD ===== */
+/* ===== EXPENSE CARD ===== */
 .expense-item {
-  position: relative;
-
   display: flex;
   align-items: center;
-  gap: 1rem;
-
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-
+  padding: 12px 14px;
+  margin-bottom: 8px;
   border-radius: 16px;
-
   background: var(--card);
   border: 1px solid var(--border);
-
   box-shadow: var(--shadow);
-
   transition: 0.2s;
 }
 
@@ -67,79 +51,208 @@
   transform: translateY(-1px);
 }
 
-/* text */
-.expense-info {
+.expense-main {
+  display: flex;
+  align-items: stretch;     /* Memastikan kontainer tombol meregang penuh dari atas ke bawah */
+  justify-content: space-between;
   flex: 1;
+  width: 100%;             /* KUNCI UTAMA: Memaksa area dalam kartu melebar penuh ke kanan */
   min-width: 0;
+}
+
+.expense-info {
+  flex: 1;                 /* Mengambil semua sisa ruang di kiri agar tombol terdorong ke kanan */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.expense-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
 
 .expense-name {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  padding-right: 40px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .expense-meta {
   font-size: 12px;
   color: var(--text-soft);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-.expense-amount {
-  font-size: 16px;
+.expense-amount-bottom {
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
+  margin-top: 6px;
+  align-self: flex-start;
 }
 
-/* ===== DELETE BUTTON (TOP RIGHT) ===== */
-.delete-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+/* ===== ACTION BUTTONS (Merapat Sempurna di Kanan) ===== */
+.expense-actions {
+  display: flex;
+  flex-direction: column;         /* Menyusun tombol secara vertikal (atas-bawah) */
+  justify-content: space-between; /* Edit berada di paling atas, Delete di paling bawah */
+  flex-shrink: 0;
+  margin-left: 20px;              /* Memberi jarak aman dari teks panjang di kiri */
+  align-self: stretch;            /* Menyelaraskan tinggi kontainer tombol dengan tinggi kartu */
+}
 
-  width: 34px;
-  height: 34px;
-
+.edit-btn {
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 10px;
-
+  border-radius: 8px;
   cursor: pointer;
-
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 12px;
+  transition: background 0.2s;
+}
 
-  font-size: 14px;
+.edit-btn:hover {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.delete-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.2s;
 }
 
 .delete-btn:hover {
   background: rgba(239, 68, 68, 0.25);
 }
 
-/* ===== EMPTY ===== */
+/* ===== EDIT FORM ===== */
+.edit-form {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 8px;
+  border: 1.5px solid var(--border);
+}
+
+.edit-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.edit-row {
+  margin-bottom: 10px;
+}
+
+.edit-row label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.edit-row input,
+.edit-row select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--card);
+  outline: none;
+  transition: border 0.2s;
+}
+
+.edit-row input:focus,
+.edit-row select:focus {
+  border-color: #6366f1;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-cancel:hover {
+  background: rgba(127,127,127,0.1);
+}
+
+.btn-save {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-save:hover {
+  opacity: 0.85;
+}
+
+.btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== EMPTY & LOADING ===== */
 .empty {
   text-align: center;
   padding: 2rem;
   color: var(--text-soft);
 }
 
-/* ===== MOBILE ===== */
+/* ===== MOBILE RESPONSIVE ===== */
 @media (max-width: 480px) {
   .expense-item {
-    padding: 0.9rem;
+    padding: 10px 12px;
   }
 
-  .expense-amount {
+  .expense-amount-bottom {
     font-size: 14px;
-  }
-
-  .delete-btn {
-    width: 32px;
-    height: 32px;
+    margin-top: 4px;
   }
 }

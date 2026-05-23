@@ -18,6 +18,9 @@ import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { getSmartCategory } from '../utils/smartCategory'
 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { storage } from '../firebase/config'
+
 import {
   CATEGORIES,
   CATEGORY_ICONS
@@ -40,17 +43,17 @@ function AddExpense() {
   })
 
   // =========================
-  // FORM CHANGE
+  // FORM UPDATE
   // =========================
   const handleChange = (e) => {
-    setForm({
-      ...form,
+    setForm(prev => ({
+      ...prev,
       [e.target.name]: e.target.value
-    })
+    }))
   }
 
   // =========================
-  // AI CATEGORIZE v2 (MEMORY FIRST)
+  // AI CATEGORY (MEMORY + GEMINI)
   // =========================
   const handleAICategorize = async () => {
 
@@ -63,7 +66,6 @@ function AddExpense() {
 
     try {
 
-      // 1. MEMORY FIRST
       const smart = await getSmartCategory(form.note)
 
       if (smart) {
@@ -72,19 +74,15 @@ function AddExpense() {
         return
       }
 
-      // 2. GEMINI FALLBACK
       const category = await categorizeExpense(
         form.note,
         form.amount
       )
 
-      setForm(prev => ({
-        ...prev,
-        category
-      }))
+      setForm(prev => ({ ...prev, category }))
 
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
       alert('AI failed')
     }
 
@@ -92,7 +90,7 @@ function AddExpense() {
   }
 
   // =========================
-  // RECEIPT SCAN
+  // RECEIPT SCAN (FIXED)
   // =========================
   const handleReceiptScan = async (e) => {
 
@@ -105,17 +103,27 @@ function AddExpense() {
 
       const result = await scanReceipt(file)
 
+      const imageUrl = await uploadReceiptImage(file)
       if (!result) {
         alert('No data detected')
         setScanLoading(false)
         return
       }
 
+      // ✅ SAFE AMOUNT CLEANING
+      const cleanAmount = result.amount
+        ? parseFloat(
+            String(result.amount)
+              .replace(/[^0-9.]/g, '')
+          )
+        : ''
+
       setForm(prev => ({
         ...prev,
-        amount: result.amount ? String(result.amount) : '',
+        amount: cleanAmount ? String(cleanAmount) : '',
         note: result.note || '',
-        category: result.category || 'Food'
+        category: result.category || 'Food',
+        imageUrl: imageUrl
       }))
 
       if (result.date) {
@@ -123,17 +131,18 @@ function AddExpense() {
         if (!isNaN(d)) setSelectedDate(d)
       }
 
+      // ONLY ONE ALERT HERE
       alert(
 `Receipt scanned successfully!
 
-Amount: ${result.amount || 'Not detected'}
+Amount: ${cleanAmount || 'Not detected'}
 Category: ${result.category || 'Not detected'}
 Note: ${result.note || 'Not detected'}
 Date: ${result.date || 'Not detected'}`
       )
 
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
       alert('Scan failed')
     }
 
@@ -141,11 +150,16 @@ Date: ${result.date || 'Not detected'}`
   }
 
   // =========================
-  // SAVE + MEMORY LEARNING
+  // SAVE EXPENSE (FIXED STABLE)
   // =========================
   const handleSubmit = async () => {
 
-    if (!form.amount || Number(form.amount) <= 0) {
+    if (!auth.currentUser) {
+      alert('Please login first')
+      return
+    }
+
+    if (!form.amount || isNaN(Number(form.amount))) {
       alert('Invalid amount')
       return
     }
@@ -154,17 +168,22 @@ Date: ${result.date || 'Not detected'}`
 
     try {
 
-      // 1. SAVE EXPENSE
-      await addDoc(collection(db, 'expenses'), {
+      const payload = {
         amount: parseFloat(form.amount),
         category: form.category,
         note: form.note,
         date: selectedDate.toISOString().slice(0, 10),
-        uid: auth.currentUser?.uid,
+        uid: auth.currentUser.uid,
         createdAt: serverTimestamp()
-      })
+      }
 
-      // 2. SMART MEMORY KEY
+      console.log('Saving expense:', payload)
+
+      await addDoc(collection(db, 'expenses'), payload)
+
+      // =========================
+      // MEMORY SYSTEM
+      // =========================
       const keyword = (form.note || '')
         .toLowerCase()
         .replace(/[^a-z0-9 ]/g, '')
@@ -172,7 +191,6 @@ Date: ${result.date || 'Not detected'}`
 
       const memoryKey = keyword.split(' ')[0]
 
-      // 3. SAVE LEARNING MEMORY
       if (memoryKey) {
 
         const ref = doc(db, 'userPatterns', memoryKey)
@@ -189,16 +207,32 @@ Date: ${result.date || 'Not detected'}`
       alert('Expense added successfully!')
       navigate('/')
 
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
       alert('Failed to save expense')
     }
 
     setLoading(false)
   }
 
-  return (
+  const uploadReceiptImage = async (file) => {
 
+  const fileRef = ref(
+    storage,
+    `receipts/${auth.currentUser.uid}/${Date.now()}.jpg`
+  )
+
+  await uploadBytes(fileRef, file)
+
+  const url = await getDownloadURL(fileRef)
+
+  return url
+}
+  
+  // =========================
+  // UI
+  // =========================
+  return (
     <div className="page-container">
 
       <h2 className="page-title">➕ Add Expense</h2>
@@ -215,7 +249,9 @@ Date: ${result.date || 'Not detected'}`
             onChange={handleReceiptScan}
           />
 
-          {scanLoading && <small>Scanning...</small>}
+          {scanLoading && (
+            <small>Scanning receipt...</small>
+          )}
         </div>
 
         {/* AMOUNT */}
@@ -231,7 +267,7 @@ Date: ${result.date || 'Not detected'}`
           />
         </div>
 
-        {/* NOTE + AI */}
+        {/* NOTE */}
         <div className="form-group">
           <label>Note</label>
 
