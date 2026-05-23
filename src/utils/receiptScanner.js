@@ -1,197 +1,189 @@
 import Tesseract from 'tesseract.js'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db, auth } from '../firebase/config'
 
+/* =========================
+   LEARNING FUNCTION
+========================= */
+async function getLearnedCategory(keyword) {
+
+  if (!keyword || !auth.currentUser) return null
+
+  try {
+
+    const q = query(
+      collection(db, 'expenses'),
+      where('uid', '==', auth.currentUser.uid)
+    )
+
+    const snap = await getDocs(q)
+
+    const map = {}
+
+    snap.forEach(doc => {
+
+      const data = doc.data()
+      const note = (data.note || '').toUpperCase()
+      const cat = data.category
+
+      if (note.includes(keyword.toUpperCase())) {
+
+        map[cat] = (map[cat] || 0) + 1
+
+      }
+
+    })
+
+    let best = null
+    let max = 0
+
+    for (const cat in map) {
+
+      if (map[cat] > max) {
+        max = map[cat]
+        best = cat
+      }
+
+    }
+
+    return best
+
+  } catch (err) {
+
+    console.error('Learning error:', err)
+    return null
+
+  }
+
+}
+
+/* =========================
+   MAIN FUNCTION
+========================= */
 export async function scanReceipt(file) {
 
   try {
 
-    const {
-      data: { text }
-    } = await Tesseract.recognize(
-      file,
-      'eng'
-    )
-
-    console.log('OCR TEXT:')
-    console.log(text)
+    const { data: { text } } =
+      await Tesseract.recognize(file, 'eng')
 
     const cleanText = text
       .replace(/\n/g, ' ')
       .replace(/\s+/g, ' ')
       .toUpperCase()
 
-    console.log('CLEAN TEXT:', cleanText)
-
     /* =========================
-       AMOUNT DETECTION
+       AMOUNT
     ========================= */
-
     let amount = ''
 
     const amountPatterns = [
-
       /TOTAL AMOUNT\s*RM\s*([0-9]+\.[0-9]{2})/i,
       /TOTAL\s*RM\s*([0-9]+\.[0-9]{2})/i,
-      /AMOUNT\s*RM\s*([0-9]+\.[0-9]{2})/i,
       /RM\s*([0-9]+\.[0-9]{2})/i
-
     ]
 
-    for (const pattern of amountPatterns) {
-
-      const match = cleanText.match(pattern)
-
-      if (match?.[1]) {
-
-        amount = match[1]
+    for (const p of amountPatterns) {
+      const m = cleanText.match(p)
+      if (m?.[1]) {
+        amount = m[1]
         break
-
       }
-
     }
 
     /* =========================
-       DATE DETECTION
+       DATE
     ========================= */
-
     let date = ''
 
-    const dateMatch = cleanText.match(
+    const d = cleanText.match(
       /([0-9]{2}\/[0-9]{2}\/[0-9]{4})/
     )
 
-    if (dateMatch?.[1]) {
+    if (d?.[1]) {
 
-      const parts = dateMatch[1].split('/')
-
-      date =
-        `${parts[2]}-${parts[1]}-${parts[0]}`
+      const [dd, mm, yyyy] = d[1].split('/')
+      date = `${yyyy}-${mm}-${dd}`
 
     }
 
     /* =========================
-       SHOP / NOTE DETECTION
+       NOTE (SHOP NAME)
     ========================= */
-
     let note = 'Receipt'
 
-    const lines = text
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean)
+    const lines = text.split('\n')
 
     for (const line of lines) {
 
-      const upper = line.toUpperCase()
+      const up = line.toUpperCase()
 
       if (
-
-        upper.includes('SDN') ||
-        upper.includes('ENTERPRISE') ||
-        upper.includes('MOTOR') ||
-        upper.includes('RESTAURANT') ||
-        upper.includes('CAFE') ||
-        upper.includes('SHOP') ||
-        upper.includes('STORE')
-
+        up.includes('ENTERPRISE') ||
+        up.includes('SDN') ||
+        up.includes('MOTOR') ||
+        up.includes('CAFE') ||
+        up.includes('SHOP')
       ) {
-
-        note = line
+        note = line.trim()
         break
-
       }
 
     }
 
     /* =========================
-       CATEGORY DETECTION
+       CATEGORY (BASE RULE)
     ========================= */
-
     let category = 'General'
 
-    // FOOD
+    const txt = cleanText
+
     if (
+      txt.includes('MCD') ||
+      txt.includes('KFC') ||
+      txt.includes('ZUS') ||
+      txt.includes('TEALIVE')
+    ) category = 'Food'
 
-      cleanText.includes('MCD') ||
-      cleanText.includes('MCDONALD') ||
-      cleanText.includes('KFC') ||
-      cleanText.includes('TEALIVE') ||
-      cleanText.includes('ZUS') ||
-      cleanText.includes('RESTAURANT') ||
-      cleanText.includes('CAFE')
-
-    ) {
-
-      category = 'Food'
-
-    }
-
-    // FUEL
     else if (
+      txt.includes('PETRONAS') ||
+      txt.includes('SHELL')
+    ) category = 'Fuel'
 
-      cleanText.includes('PETRONAS') ||
-      cleanText.includes('SHELL') ||
-      cleanText.includes('PETROL') ||
-      cleanText.includes('SETEL')
-
-    ) {
-
-      category = 'Fuel'
-
-    }
-
-    // SHOPPING
     else if (
+      txt.includes('SHOPEE') ||
+      txt.includes('AEON') ||
+      txt.includes('MR DIY')
+    ) category = 'Shopping'
 
-      cleanText.includes('MR DIY') ||
-      cleanText.includes('LOTUSS') ||
-      cleanText.includes('LOTUS') ||
-      cleanText.includes('AEON') ||
-      cleanText.includes('SHOPEE')
-
-    ) {
-
-      category = 'Shopping'
-
-    }
-
-    // TRANSPORT
     else if (
+      txt.includes('GRAB') ||
+      txt.includes('TNG')
+    ) category = 'Transport'
 
-      cleanText.includes('GRAB') ||
-      cleanText.includes('TNG') ||
-      cleanText.includes('TOUCH N GO')
-
-    ) {
-
-      category = 'Transport'
-
-    }
-
-    // HEALTH
     else if (
+      txt.includes('WATSON') ||
+      txt.includes('PHARMACY')
+    ) category = 'Health'
 
-      cleanText.includes('WATSON') ||
-      cleanText.includes('GUARDIAN') ||
-      cleanText.includes('PHARMACY')
-
-    ) {
-
-      category = 'Health'
-
-    }
-
-    // MAINTENANCE
     else if (
+      txt.includes('MOTOR') ||
+      txt.includes('WORKSHOP')
+    ) category = 'Maintenance'
 
-      cleanText.includes('MOTOR') ||
-      cleanText.includes('WORKSHOP') ||
-      cleanText.includes('SPARE PART')
+    /* =========================
+       🧠 AI LEARNING LAYER
+    ========================= */
 
-    ) {
+    const learned = await getLearnedCategory(note)
 
-      category = 'Maintenance'
-
+    if (learned) {
+      category = learned
     }
+
+    /* =========================
+       RESULT
+    ========================= */
 
     alert(
 `Receipt scanned successfully!
@@ -203,20 +195,16 @@ Date: ${date || 'Not detected'}`
     )
 
     return {
-
       amount,
       category,
       note,
       date
-
     }
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error(error)
-
+    console.error(err)
     alert('Failed to scan receipt.')
-
     return null
 
   }
