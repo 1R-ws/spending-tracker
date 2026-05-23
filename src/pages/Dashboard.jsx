@@ -263,7 +263,7 @@ function Dashboard() {
 
               <div className="cat-pill-amt">
 
-                RM {cat.value.toFixed(0)}
+                RM {cat.value.toFixed(2)}
 
               </div>
 
