@@ -1,3 +1,7 @@
+/* =========================
+   HISTORY (DARK MODE FIX)
+========================= */
+
 .filter-row {
   display: flex;
   gap: 8px;
@@ -9,45 +13,61 @@
   flex: 1;
   min-width: 120px;
   padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
   font-size: 13px;
-  background: white;
-  color: #333;
+
+  background: var(--card);
+  color: var(--text);
+
+  outline: none;
 }
 
 .export-btn {
   padding: 8px 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: white;
+
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  background: var(--card);
+  color: var(--text);
+
   font-size: 13px;
   cursor: pointer;
-  color: #333;
 }
 
 .export-btn:hover {
-  background: #f5f5f5;
+  background: rgba(127,127,127,0.1);
 }
 
 /* ===== CARD ===== */
 .expense-item {
-  position: relative; /* IMPORTANT for top-right button */
+  position: relative;
+
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1rem 1rem 1rem;
-  border-radius: 16px;
-  transition: 0.2s;
+
+  padding: 1rem;
   margin-bottom: 0.75rem;
-  background: #f9fafb;
+
+  border-radius: 16px;
+
+  background: var(--card);
+  border: 1px solid var(--border);
+
+  box-shadow: var(--shadow);
+
+  transition: 0.2s;
 }
 
 .expense-item:hover {
-  background: #f3f4f6;
+  transform: translateY(-1px);
 }
 
-/* text area */
+/* text */
 .expense-info {
   flex: 1;
   min-width: 0;
@@ -56,35 +76,39 @@
 .expense-name {
   font-size: 15px;
   font-weight: 600;
-  color: #111827;
-  padding-right: 40px; /* space for delete button */
+  color: var(--text);
+  padding-right: 40px;
 }
 
 .expense-meta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-soft);
   margin-top: 4px;
 }
 
 .expense-amount {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
   white-space: nowrap;
 }
 
-/* ===== DELETE BUTTON FIX (TOP RIGHT) ===== */
+/* ===== DELETE BUTTON (TOP RIGHT) ===== */
 .delete-btn {
   position: absolute;
   top: 10px;
   right: 10px;
 
-  border: none;
-  background: #fee2e2;
   width: 34px;
   height: 34px;
+
+  border: none;
   border-radius: 10px;
+
   cursor: pointer;
+
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 
   display: flex;
   align-items: center;
@@ -94,10 +118,17 @@
 }
 
 .delete-btn:hover {
-  background: #fecaca;
+  background: rgba(239, 68, 68, 0.25);
 }
 
-/* ===== MOBILE ADJUSTMENT ===== */
+/* ===== EMPTY ===== */
+.empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-soft);
+}
+
+/* ===== MOBILE ===== */
 @media (max-width: 480px) {
   .expense-item {
     padding: 0.9rem;
