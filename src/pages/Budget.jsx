@@ -1,123 +1,114 @@
 import { useEffect, useState } from 'react'
 
-import {
-  doc,
-  setDoc,
-  getDoc
-} from 'firebase/firestore'
-
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { db, auth } from '../firebase/config'
 
-import {
-  CATEGORIES,
-  COLORS,
-  CATEGORY_ICONS
-} from '../constants/categories'
-
+import { CATEGORIES, COLORS, CATEGORY_ICONS } from '../constants/categories'
 import { useExpenses } from '../hooks/useExpenses'
 
 function Budget() {
 
-  const {
-    expenses,
-    loading
-  } = useExpenses()
+  const { expenses, loading } = useExpenses()
 
   const [budgets, setBudgets] = useState({})
   const [inputs, setInputs] = useState({})
+  const [editMode, setEditMode] = useState({})
 
-  const thisMonth = new Date()
-    .toISOString()
-    .slice(0, 7)
+  const thisMonth = new Date().toISOString().slice(0, 7)
 
-  // Load budgets
   useEffect(() => {
 
-    const loadBudgets = async () => {
+    const load = async () => {
 
-      try {
+      if (!auth.currentUser) return
 
-        if (!auth.currentUser) {
-          return
-        }
+      const ref = doc(db, 'budgets', auth.currentUser.uid)
+      const snap = await getDoc(ref)
 
-        const ref = doc(
-          db,
-          'budgets',
-          auth.currentUser.uid
-        )
-
-        const snap = await getDoc(ref)
-
-        if (snap.exists()) {
-
-          setBudgets(snap.data())
-          setInputs(snap.data())
-
-        }
-
-      } catch (error) {
-
-        console.error(error)
-
+      if (snap.exists()) {
+        setBudgets(snap.data())
       }
 
     }
 
-    loadBudgets()
+    load()
 
   }, [])
 
-  // Save budget
+  const handleEdit = (cat) => {
+
+    setEditMode(prev => ({
+      ...prev,
+      [cat]: true
+    }))
+
+    // IMPORTANT FIX: always sync latest value
+    setInputs(prev => ({
+      ...prev,
+      [cat]: budgets[cat] || ''
+    }))
+
+  }
+
   const handleSave = async (cat) => {
 
-    try {
+    const raw = inputs[cat]
 
-      const val = parseFloat(inputs[cat])
+    // allow empty = no limit
+    if (raw === '' || raw === null || raw === undefined) {
 
-      if (isNaN(val) || val <= 0) {
-
-        alert('Please enter a valid amount.')
-        return
-
-      }
-
-      const updated = {
-        ...budgets,
-        [cat]: val
-      }
+      const updated = { ...budgets }
+      delete updated[cat]
 
       setBudgets(updated)
+      setEditMode(prev => ({ ...prev, [cat]: false }))
 
       await setDoc(
-        doc(
-          db,
-          'budgets',
-          auth.currentUser.uid
-        ),
+        doc(db, 'budgets', auth.currentUser.uid),
         updated
       )
 
-      alert(`${cat} budget saved!`)
-
-    } catch (error) {
-
-      console.error(error)
-
-      alert('Failed to save budget.')
-
+      return
     }
+
+    const val = Number(raw)
+
+    if (isNaN(val) || val < 0) return
+
+    const updated = {
+      ...budgets,
+      [cat]: val
+    }
+
+    setBudgets(updated)
+
+    setEditMode(prev => ({
+      ...prev,
+      [cat]: false
+    }))
+
+    await setDoc(
+      doc(db, 'budgets', auth.currentUser.uid),
+      updated
+    )
+  }
+
+  const handleCancel = (cat) => {
+
+    setInputs(prev => ({
+      ...prev,
+      [cat]: budgets[cat] || ''
+    }))
+
+    setEditMode(prev => ({
+      ...prev,
+      [cat]: false
+    }))
 
   }
 
   if (loading) {
-
-    return (
-      <div className="loading">
-        Loading...
-      </div>
-    )
-
+    return <div className="loading">Loading...</div>
   }
 
   const thisMonthExp = expenses.filter(
@@ -125,113 +116,25 @@ function Budget() {
   )
 
   return (
-
     <div className="page-container">
 
-      <h2 className="page-title">
-        💰 Budget
-      </h2>
+      <h2 className="page-title">💰 Budget</h2>
 
-      {/* Set Budget */}
-      <div
-        className="form-card"
-        style={{ marginBottom: '1rem' }}
-      >
-
-        <h3 className="chart-title">
-          Set Monthly Limits
-        </h3>
-
-        {CATEGORIES.map(cat => (
-
-          <div
-            key={cat}
-            className="budget-input-row"
-          >
-
-            <span className="budget-cat-label">
-
-              <span
-                style={{
-                  fontSize: '18px'
-                }}
-              >
-                {CATEGORY_ICONS[cat]}
-              </span>
-
-              {cat}
-
-            </span>
-
-            <input
-              type="number"
-              placeholder="No limit"
-              value={inputs[cat] || ''}
-              onChange={e =>
-                setInputs({
-                  ...inputs,
-                  [cat]: e.target.value
-                })
-              }
-              min="0"
-              step="1"
-            />
-
-            <button
-              className="save-btn"
-              onClick={() => handleSave(cat)}
-            >
-              Save
-            </button>
-
-          </div>
-
-        ))}
-
-      </div>
-
-      {/* Budget Progress */}
-      <div className="form-card">
-
-        <h3 className="chart-title">
-
-          Progress • {
-
-            new Date().toLocaleString(
-              'default',
-              {
-                month: 'long',
-                year: 'numeric'
-              }
-            )
-
-          }
-
-        </h3>
+      <div className="budget-grid">
 
         {CATEGORIES.map(cat => {
 
           const spent = thisMonthExp
             .filter(e => e.category === cat)
-            .reduce(
-              (s, e) => s + Number(e.amount || 0),
-              0
-            )
+            .reduce((s, e) => s + Number(e.amount || 0), 0)
 
-          const limit = Number(
-            budgets[cat] || 0
-          )
+          const limit = Number(budgets[cat] || 0)
 
           const pct = limit > 0
-            ? Math.min(
-                (spent / limit) * 100,
-                100
-              )
+            ? Math.min((spent / limit) * 100, 100)
             : 0
 
-          const over =
-            limit > 0 &&
-            spent > limit
+          const over = limit > 0 && spent > limit
 
           const color = over
             ? '#E24B4A'
@@ -239,76 +142,101 @@ function Budget() {
               ? '#EF9F27'
               : COLORS[cat]
 
+          const isEditing = editMode[cat]
+
           return (
 
-            <div
-              key={cat}
-              className="budget-progress-item"
-            >
+            <div key={cat} className="budget-card">
 
-              <div className="budget-progress-header">
+              {/* HEADER */}
+              <div className="budget-top">
 
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8
-                  }}
-                >
+                <div className="budget-left">
 
-                  <span
+                  <div
+                    className="budget-icon"
                     style={{
-                      fontSize: '18px'
+                      background: COLORS[cat] + '22',
+                      color: COLORS[cat]
                     }}
                   >
                     {CATEGORY_ICONS[cat]}
-                  </span>
+                  </div>
 
-                  {cat}
+                  <div>
+                    <div className="budget-title">{cat}</div>
 
-                </span>
+                    <div className="budget-sub">
+                      RM {spent.toFixed(2)}
+                      {limit > 0 ? ` / RM ${limit}` : ' / RM 0'}
+                    </div>
+                  </div>
 
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8
-                  }}
-                >
+                </div>
 
-                  <span className="budget-amounts">
-
-                    RM {spent.toFixed(2)}
-
-                    {limit > 0
-                      ? ` / RM ${limit.toFixed(2)}`
-                      : ' (No limit)'}
-
-                  </span>
-
-                  {over && (
-
-                    <span className="badge-over">
-                      Over!
-                    </span>
-
-                  )}
-
-                </span>
+                {!isEditing && (
+                  <button
+                    className="save-btn"
+                    onClick={() => handleEdit(cat)}
+                  >
+                    Edit
+                  </button>
+                )}
 
               </div>
 
-              {limit > 0 && (
+              {/* INPUT */}
+              {isEditing && (
 
-                <div className="progress-bar">
+                <div className="budget-input-wrap">
 
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${pct}%`,
-                      background: color
-                    }}
-                  ></div>
+                  <input
+                    className="budget-input"
+                    type="number"
+                    value={inputs[cat] || ''}
+                    onChange={e =>
+                      setInputs({
+                        ...inputs,
+                        [cat]: e.target.value
+                      })
+                    }
+                  />
+
+                  <button
+                    className="budget-save"
+                    onClick={() => handleSave(cat)}
+                  >
+                    Save
+                  </button>
+
+                  <button
+                    className="save-btn"
+                    onClick={() => handleCancel(cat)}
+                    style={{ background: '#aaa' }}
+                  >
+                    Cancel
+                  </button>
+
+                </div>
+
+              )}
+
+              {/* PROGRESS */}
+              {limit > 0 && !isEditing && (
+
+                <div className="budget-progress">
+
+                  <div className="budget-bar">
+
+                    <div
+                      className="budget-fill"
+                      style={{
+                        width: `${pct}%`,
+                        background: color
+                      }}
+                    />
+
+                  </div>
 
                 </div>
 
@@ -323,9 +251,7 @@ function Budget() {
       </div>
 
     </div>
-
   )
-
 }
 
 export default Budget

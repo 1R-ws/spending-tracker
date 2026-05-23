@@ -29,7 +29,7 @@ export const COLORS = {
 }
 
 export const CATEGORY_ICONS = {
-  Food: '🍔',
+  Food: '🍽️',
   Fuel: '⛽',
   Shopping: '🛒',
   Bills: '📄',
