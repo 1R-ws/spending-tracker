@@ -30,11 +30,13 @@
   background: #f5f5f5;
 }
 
+/* ===== CARD ===== */
 .expense-item {
+  position: relative; /* IMPORTANT for top-right button */
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem;
+  padding: 1rem 1rem 1rem 1rem;
   border-radius: 16px;
   transition: 0.2s;
   margin-bottom: 0.75rem;
@@ -45,14 +47,17 @@
   background: #f3f4f6;
 }
 
+/* text area */
 .expense-info {
   flex: 1;
+  min-width: 0;
 }
 
 .expense-name {
   font-size: 15px;
   font-weight: 600;
   color: #111827;
+  padding-right: 40px; /* space for delete button */
 }
 
 .expense-meta {
@@ -65,16 +70,45 @@
   font-size: 16px;
   font-weight: 700;
   color: #111827;
+  white-space: nowrap;
 }
 
+/* ===== DELETE BUTTON FIX (TOP RIGHT) ===== */
 .delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+
   border: none;
   background: #fee2e2;
-  padding: 0.6rem 0.8rem;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
   cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 14px;
 }
 
 .delete-btn:hover {
-  background: #fff0f0;
+  background: #fecaca;
+}
+
+/* ===== MOBILE ADJUSTMENT ===== */
+@media (max-width: 480px) {
+  .expense-item {
+    padding: 0.9rem;
+  }
+
+  .expense-amount {
+    font-size: 14px;
+  }
+
+  .delete-btn {
+    width: 32px;
+    height: 32px;
+  }
 }
