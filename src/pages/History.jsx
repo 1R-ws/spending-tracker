@@ -5,12 +5,18 @@ import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
 import { useExpenses } from '../hooks/useExpenses'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import { exportToExcel } from '../utils/exportExcel'
 
 function History() {
   const { expenses, loading } = useExpenses()
 
+  const handleExportExcel = () => {
+  exportToExcel(filtered, `spending-${filterMonth || 'all'}`)
+}
+
   const [filterCat, setFilterCat] = useState('All')
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [viewReceipt, setViewReceipt] = useState(null)
 
   // Edit state
   const [editingId, setEditingId] = useState(null)
@@ -36,7 +42,7 @@ function History() {
       category: e.category,
       note: e.note || ''
     })
-    setEditDate(e.date ? new Date(e.date) : new Date())
+    setEditDate(e.date ? new Date(e.date + 'T00:00:00') : new Date())
   }
 
   // ── CANCEL EDIT ──
@@ -51,7 +57,6 @@ function History() {
       alert('Please enter a valid amount.')
       return
     }
-
     setSaveLoading(true)
     try {
       await updateDoc(doc(db, 'expenses', editingId), {
@@ -74,15 +79,38 @@ function History() {
     .filter(e => filterCat === 'All' || e.category === filterCat)
     .sort((a, b) => b.date?.localeCompare(a.date))
 
-  // ── EXPORT CSV ──
+  // ── EXPORT CSV with receipt image ──
   const exportCSV = () => {
-    const headers = ['Date', 'Category', 'Amount (RM)', 'Note']
-    const rows = filtered.map(e => [e.date, e.category, e.amount, e.note || ''])
+    const headers = ['Date', 'Category', 'Amount (RM)', 'Note', 'Receipt Image (Base64)']
+    const rows = filtered.map(e => [
+      e.date,
+      e.category,
+      e.amount,
+      `"${(e.note || '').replace(/"/g, '""')}"`,
+      e.receiptImage ? `"${e.receiptImage}"` : ''
+    ])
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
     a.download = `spending-${filterMonth || 'all'}.csv`
     a.click()
+  }
+
+  // ── EXPORT RECEIPTS as individual images ──
+  const exportReceipts = () => {
+    const withReceipts = filtered.filter(e => e.receiptImage)
+    if (withReceipts.length === 0) {
+      alert('No receipts found for this period.')
+      return
+    }
+    withReceipts.forEach((e, i) => {
+      setTimeout(() => {
+        const a = document.createElement('a')
+        a.href = e.receiptImage
+        a.download = `receipt-${e.date}-${e.category}-RM${e.amount}.jpg`
+        a.click()
+      }, i * 500)
+    })
   }
 
   const months = Array.from({ length: 6 }, (_, i) => {
@@ -115,7 +143,9 @@ function History() {
           ))}
         </select>
 
-        <button className="export-btn" onClick={exportCSV}>⬇ Export CSV</button>
+        <button className="export-btn" onClick={exportCSV}>⬇ CSV</button>
+        <button className="export-btn" onClick={handleExportExcel}>📊 Excel</button>
+        <button className="export-btn" onClick={exportReceipts}>🧾 Receipts</button>
       </div>
 
       {/* LIST */}
@@ -129,25 +159,36 @@ function History() {
             {editingId !== e.id ? (
               <div className="expense-item">
                 <div className="expense-main">
-                  
-                  {/* Sisi Kiri: Informasi Data Pengeluaran */}
+
                   <div className="expense-info">
                     <div className="expense-header-row">
                       <div className="expense-name">
                         {CATEGORY_ICONS[e.category]} {e.note || e.category}
                       </div>
                     </div>
-
                     <div className="expense-meta">
                       {e.category} · {e.date}
                     </div>
-                    
                     <div className="expense-amount-bottom">
                       RM {Number(e.amount || 0).toFixed(2)}
                     </div>
+
+                    {/* RECEIPT THUMBNAIL */}
+                    {e.receiptImage && (
+                      <div
+                        className="receipt-thumb-wrap"
+                        onClick={() => setViewReceipt(e.receiptImage)}
+                      >
+                        <img
+                          src={e.receiptImage}
+                          alt="Receipt"
+                          className="receipt-thumb"
+                        />
+                        <span className="receipt-thumb-label">🧾 View Receipt</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Sisi Kanan: Tombol Aksi Menegak (Edit di atas, Delete di bawah) */}
                   <div className="expense-actions">
                     <button className="edit-btn" onClick={() => handleEditOpen(e)}>✏️</button>
                     <button className="delete-btn" onClick={() => handleDelete(e.id)}>🗑</button>
@@ -217,6 +258,23 @@ function History() {
           </div>
         ))}
       </div>
+
+      {/* RECEIPT MODAL */}
+      {viewReceipt && (
+        <div className="receipt-modal-overlay" onClick={() => setViewReceipt(null)}>
+          <div className="receipt-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="receipt-modal-header">
+              <span>🧾 Receipt</span>
+              <button className="receipt-modal-close" onClick={() => setViewReceipt(null)}>✕</button>
+            </div>
+            <img src={viewReceipt} alt="Receipt" className="receipt-modal-img" />
+            <a href={viewReceipt} download="receipt.jpg" className="receipt-download-btn">
+              ⬇ Download Receipt
+            </a>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

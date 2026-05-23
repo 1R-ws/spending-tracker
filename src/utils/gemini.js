@@ -159,7 +159,7 @@ export async function categorizeExpense(
     // 2. Fallback to Gemini AI
     const model =
       genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash-latest'
+        model: 'gemini-2.0-flash-lite'
       })
 
     const prompt = `

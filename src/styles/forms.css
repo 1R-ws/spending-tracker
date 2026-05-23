@@ -98,3 +98,57 @@
   display: block;
   line-height: 1.4;
 }
+
+/* RECEIPT UPLOAD */
+.receipt-upload-box {
+  width: 100%;
+}
+
+.receipt-upload-label {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: border 0.2s;
+}
+
+.receipt-upload-label:hover {
+  border-color: var(--primary-soft);
+  color: var(--primary-soft);
+}
+
+.receipt-preview-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.receipt-preview-img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.receipt-remove-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: #ef4444;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.receipt-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+

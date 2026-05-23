@@ -194,41 +194,90 @@ export async function scanReceipt(file) {
     }
 
     // =========================
-    // AI CATEGORY
+    // AUTO CATEGORY (NO AI NEEDED)
     // =========================
 
-    let category = 'Other'
-
-    try {
-
-      category = await categorizeExpense(
-        note,
-        amount
-      )
-
-    } catch (e) {
-
-      console.log(e)
-
-    }
-
-    // =========================
-    // AUTO CATEGORY FALLBACK
-    // =========================
+    let category = 'General'
 
     const lowerNote = note.toLowerCase()
+    const lowerClean = clean.toLowerCase()
 
     if (
-      lowerNote.includes('motor') ||
-      lowerNote.includes('workshop') ||
-      lowerNote.includes('tyre') ||
-      lowerNote.includes('service') ||
-      lowerNote.includes('spare')
-    ) {
+    lowerNote.includes('food') ||
+    lowerNote.includes('restaurant') ||
+    lowerNote.includes('cafe') ||
+    lowerNote.includes('mamak') ||
+    lowerNote.includes('kitchen') ||
+    lowerClean.includes('food') ||
+    lowerClean.includes('nasi') ||
+    lowerClean.includes('makan')
+    ) { category = 'Food' }
 
-      category = 'Maintenance'
+    else if (
+    lowerNote.includes('motor') ||
+    lowerNote.includes('workshop') ||
+    lowerNote.includes('tyre') ||
+    lowerNote.includes('service') ||
+    lowerNote.includes('spare') ||
+    lowerNote.includes('gear') ||
+    lowerNote.includes('pedal') ||
+    lowerNote.includes('footrest') ||
+    lowerClean.includes('motor') ||
+    lowerClean.includes('workshop')
+    ) { category = 'Maintenance' }
 
-    }
+    else if (
+    lowerNote.includes('petrol') ||
+    lowerNote.includes('fuel') ||
+    lowerNote.includes('shell') ||
+    lowerNote.includes('petronas') ||
+    lowerNote.includes('caltex') ||
+    lowerClean.includes('petrol') ||
+    lowerClean.includes('fuel')
+    ) { category = 'Fuel' }
+
+    else if (
+    lowerNote.includes('pharmacy') ||
+    lowerNote.includes('clinic') ||
+    lowerNote.includes('hospital') ||
+    lowerNote.includes('guardian') ||
+    lowerNote.includes('watson') ||
+    lowerClean.includes('pharmacy') ||
+    lowerClean.includes('ubat')
+    ) { category = 'Health' }
+
+    else if (
+    lowerNote.includes('grab') ||
+    lowerNote.includes('myrapid') ||
+    lowerNote.includes('ktm') ||
+    lowerNote.includes('lrt') ||
+    lowerNote.includes('taxi') ||
+    lowerClean.includes('transport')
+    ) { category = 'Travel' }
+
+    else if (
+    lowerNote.includes('mall') ||
+    lowerNote.includes('store') ||
+    lowerNote.includes('shop') ||
+    lowerNote.includes('market') ||
+    lowerNote.includes('supermarket') ||
+    lowerNote.includes('giant') ||
+    lowerNote.includes('tesco') ||
+    lowerNote.includes('mydin') ||
+    lowerClean.includes('shopping')
+    ) { category = 'Shopping' }
+
+    else if (
+    lowerNote.includes('bill') ||
+    lowerNote.includes('tnb') ||
+    lowerNote.includes('unifi') ||
+    lowerNote.includes('celcom') ||
+    lowerNote.includes('digi') ||
+    lowerNote.includes('maxis') ||
+    lowerClean.includes('utility')
+    ) { category = 'Bills' }
+
+   
 
     // =========================
     // FINAL DEBUG

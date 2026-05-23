@@ -18,21 +18,37 @@ import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { getSmartCategory } from '../utils/smartCategory'
 
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { storage } from '../firebase/config'
+import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
 
-import {
-  CATEGORIES,
-  CATEGORY_ICONS
-} from '../constants/categories'
+// compress image and convert to base64
+function compressImage(file, maxWidth = 800) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const scale = Math.min(1, maxWidth / img.width)
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.7))
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 function AddExpense() {
-
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [scanLoading, setScanLoading] = useState(false)
+  const [receiptBase64, setReceiptBase64] = useState(null)
+  const [receiptPreview, setReceiptPreview] = useState(null)
 
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -42,124 +58,97 @@ function AddExpense() {
     note: ''
   })
 
-  // =========================
-  // FORM UPDATE
-  // =========================
   const handleChange = (e) => {
-    setForm(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }))
+    setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  // =========================
-  // AI CATEGORY (MEMORY + GEMINI)
-  // =========================
+  // ── AI CATEGORIZE ──
   const handleAICategorize = async () => {
-
     if (!form.note) {
       alert('Please enter a note first.')
       return
     }
-
     setAiLoading(true)
-
     try {
-
       const smart = await getSmartCategory(form.note)
-
       if (smart) {
         setForm(prev => ({ ...prev, category: smart }))
         setAiLoading(false)
         return
       }
-
-      const category = await categorizeExpense(
-        form.note,
-        form.amount
-      )
-
+      const category = await categorizeExpense(form.note, form.amount)
       setForm(prev => ({ ...prev, category }))
-
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error)
       alert('AI failed')
     }
-
     setAiLoading(false)
   }
 
-  // =========================
-  // RECEIPT SCAN (FIXED)
-  // =========================
+  // ── RECEIPT SCAN + BASE64 ──
   const handleReceiptScan = async (e) => {
-
     const file = e.target.files[0]
     if (!file) return
 
     setScanLoading(true)
 
     try {
+      // 1. Compress and save as base64
+      const base64 = await compressImage(file)
+      setReceiptBase64(base64)
+      setReceiptPreview(base64)
 
+      // 2. Scan for expense data
       const result = await scanReceipt(file)
 
-      const imageUrl = await uploadReceiptImage(file)
       if (!result) {
         alert('No data detected')
         setScanLoading(false)
         return
       }
 
-      // ✅ SAFE AMOUNT CLEANING
-      const cleanAmount = result.amount
-        ? parseFloat(
-            String(result.amount)
-              .replace(/[^0-9.]/g, '')
-          )
-        : ''
-
       setForm(prev => ({
         ...prev,
-        amount: cleanAmount ? String(cleanAmount) : '',
+        amount: result.amount ? String(result.amount) : '',
         note: result.note || '',
-        category: result.category || 'Food',
-        imageUrl: imageUrl
+        category: result.category || 'General'
       }))
 
       if (result.date) {
-        const d = new Date(result.date)
-        if (!isNaN(d)) setSelectedDate(d)
+        // handle dd/MM/yyyy format
+        const parts = result.date.split('/')
+        if (parts.length === 3) {
+          const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+          if (!isNaN(d)) setSelectedDate(d)
+        }
       }
 
-      // ONLY ONE ALERT HERE
       alert(
-`Receipt scanned successfully!
+`✅ Receipt scanned!
 
-Amount: ${cleanAmount || 'Not detected'}
+Amount: RM ${result.amount || 'Not detected'}
 Category: ${result.category || 'Not detected'}
 Note: ${result.note || 'Not detected'}
 Date: ${result.date || 'Not detected'}`
       )
 
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error)
       alert('Scan failed')
     }
 
     setScanLoading(false)
   }
 
-  // =========================
-  // SAVE EXPENSE (FIXED STABLE)
-  // =========================
+  // ── REMOVE RECEIPT ──
+  const handleRemoveReceipt = () => {
+    setReceiptBase64(null)
+    setReceiptPreview(null)
+  }
+
+  // ── SAVE EXPENSE ──
   const handleSubmit = async () => {
-
-    if (!auth.currentUser) {
-      alert('Please login first')
-      return
-    }
-
-    if (!form.amount || isNaN(Number(form.amount))) {
+    if (!form.amount || Number(form.amount) <= 0) {
       alert('Invalid amount')
       return
     }
@@ -167,143 +156,112 @@ Date: ${result.date || 'Not detected'}`
     setLoading(true)
 
     try {
-
-      const payload = {
+      // Save expense with receipt base64
+      await addDoc(collection(db, 'expenses'), {
         amount: parseFloat(form.amount),
         category: form.category,
         note: form.note,
         date: selectedDate.toISOString().slice(0, 10),
-        uid: auth.currentUser.uid,
-        createdAt: serverTimestamp()
-      }
+        uid: auth.currentUser?.uid,
+        createdAt: serverTimestamp(),
+        receiptImage: receiptBase64 || null
+      })
 
-      console.log('Saving expense:', payload)
-
-      await addDoc(collection(db, 'expenses'), payload)
-
-      // =========================
-      // MEMORY SYSTEM
-      // =========================
+      // Smart memory learning
       const keyword = (form.note || '')
         .toLowerCase()
         .replace(/[^a-z0-9 ]/g, '')
         .trim()
-
       const memoryKey = keyword.split(' ')[0]
 
       if (memoryKey) {
-
         const ref = doc(db, 'userPatterns', memoryKey)
-
         await setDoc(ref, {
           [form.category]: {
             count: increment(1),
             lastUsed: serverTimestamp()
           }
         }, { merge: true })
-
       }
 
       alert('Expense added successfully!')
       navigate('/')
 
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error)
       alert('Failed to save expense')
     }
 
     setLoading(false)
   }
 
-  const uploadReceiptImage = async (file) => {
-
-  const fileRef = ref(
-    storage,
-    `receipts/${auth.currentUser.uid}/${Date.now()}.jpg`
-  )
-
-  await uploadBytes(fileRef, file)
-
-  const url = await getDownloadURL(fileRef)
-
-  return url
-}
-  
-  // =========================
-  // UI
-  // =========================
   return (
     <div className="page-container">
-
       <h2 className="page-title">➕ Add Expense</h2>
 
       <div className="form-card">
 
-        {/* SCAN */}
+        {/* SCAN RECEIPT */}
         <div className="form-group">
-          <label>Scan Receipt</label>
+          <label>📷 Scan Receipt (optional)</label>
 
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleReceiptScan}
-          />
-
-          {scanLoading && (
-            <small>Scanning receipt...</small>
+          {!receiptPreview ? (
+            <div className="receipt-upload-box">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleReceiptScan}
+                id="receipt-input"
+                style={{ display: 'none' }}
+              />
+              <label htmlFor="receipt-input" className="receipt-upload-label">
+                {scanLoading ? '🔍 Scanning...' : '📷 Upload Receipt'}
+              </label>
+            </div>
+          ) : (
+            <div className="receipt-preview-wrap">
+              <img src={receiptPreview} alt="Receipt" className="receipt-preview-img" />
+              <button className="receipt-remove-btn" onClick={handleRemoveReceipt}>✕ Remove</button>
+            </div>
           )}
         </div>
 
         {/* AMOUNT */}
         <div className="form-group">
           <label>Amount (RM)</label>
-
           <input
             type="number"
             name="amount"
             value={form.amount}
             onChange={handleChange}
             step="0.01"
+            placeholder="0.00"
           />
         </div>
 
-        {/* NOTE */}
+        {/* NOTE + AI */}
         <div className="form-group">
           <label>Note</label>
-
           <div style={{ display: 'flex', gap: 8 }}>
-
             <input
               name="note"
               value={form.note}
               onChange={handleChange}
+              placeholder="e.g. lunch at mamak"
               style={{ flex: 1 }}
             />
-
-            <button
-              className="ai-btn"
-              onClick={handleAICategorize}
-              disabled={aiLoading}
-            >
-              {aiLoading ? '...' : 'AI'}
+            <button className="ai-btn" onClick={handleAICategorize} disabled={aiLoading}>
+              {aiLoading ? '...' : '🤖 AI'}
             </button>
-
           </div>
         </div>
 
         {/* CATEGORY */}
         <div className="form-group">
           <label>Category</label>
-
-          <select
-            name="category"
-            value={form.category}
-            onChange={handleChange}
-          >
+          <select name="category" value={form.category} onChange={handleChange}>
             {CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>
-                {CATEGORY_ICONS[cat]} {cat}
-              </option>
+              <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat}</option>
             ))}
           </select>
         </div>
@@ -311,25 +269,21 @@ Date: ${result.date || 'Not detected'}`
         {/* DATE */}
         <div className="form-group">
           <label>Date</label>
-
           <DatePicker
             selected={selectedDate}
             onChange={setSelectedDate}
             maxDate={new Date()}
+            dateFormat="dd/MM/yyyy"
+            className="datepicker-input"
           />
         </div>
 
         {/* SAVE */}
-        <button
-          className="btn-primary"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
+        <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
           {loading ? 'Saving...' : '+ Add Expense'}
         </button>
 
       </div>
-
     </div>
   )
 }
