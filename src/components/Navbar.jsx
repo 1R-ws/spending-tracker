@@ -1,51 +1,72 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { auth } from '../firebase/config'
 import { signOut } from 'firebase/auth'
-import { useState } from 'react'
 
 function Navbar() {
 
+  const [open, setOpen] = useState(false)
   const [dark, setDark] = useState(false)
 
-  const toggleDarkMode = () => {
+  const toggleMenu = () => {
+    setOpen(!open)
+  }
+
+  const toggleDark = () => {
     setDark(!dark)
     document.body.classList.toggle('dark')
   }
 
-  const handleLogout = async () => {
+  const logout = async () => {
     await signOut(auth)
   }
 
   return (
-    <div className="navbar">
+    <div className="topbar">
 
-      {/* LEFT - BRAND */}
-      <div className="nav-brand">
-        💰 ExpenseApp
-      </div>
+      {/* TOP BAR */}
+      <div className="topbar-header">
 
-      {/* CENTER - MENU */}
-      <div className="nav-links">
+        <div className="brand">
+          💰 ExpenseApp
+        </div>
 
-        <NavLink to="/dashboard">🏠 Dashboard</NavLink>
-        <NavLink to="/add">➕ Add</NavLink>
-        <NavLink to="/history">📜 History</NavLink>
-        <NavLink to="/budget">💰 Budget</NavLink>
-
-      </div>
-
-      {/* RIGHT - ACTIONS */}
-      <div className="nav-actions">
-
-        <button className="theme-btn" onClick={toggleDarkMode}>
-          {dark ? '☀️' : '🌙'}
-        </button>
-
-        <button className="logout-btn" onClick={handleLogout}>
-          Logout
+        <button className="menu-btn" onClick={toggleMenu}>
+          ☰
         </button>
 
       </div>
+
+      {/* DROPDOWN MENU */}
+      {open && (
+        <div className="menu-dropdown">
+
+          <NavLink to="/dashboard" onClick={() => setOpen(false)}>
+            🏠 Dashboard
+          </NavLink>
+
+          <NavLink to="/add" onClick={() => setOpen(false)}>
+            ➕ Add
+          </NavLink>
+
+          <NavLink to="/history" onClick={() => setOpen(false)}>
+            📜 History
+          </NavLink>
+
+          <NavLink to="/budget" onClick={() => setOpen(false)}>
+            💰 Budget
+          </NavLink>
+
+          <button onClick={toggleDark}>
+            ☀️ Dark Mode
+          </button>
+
+          <button onClick={logout} className="logout">
+            🚪 Logout
+          </button>
+
+        </div>
+      )}
 
     </div>
   )
