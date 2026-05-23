@@ -46,7 +46,7 @@ function Navbar() {
           </NavLink>
 
           <NavLink to="/add" onClick={() => setOpen(false)}>
-            ➕ Add
+            ➕ Add Expense
           </NavLink>
 
           <NavLink to="/history" onClick={() => setOpen(false)}>
