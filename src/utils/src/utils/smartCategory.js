@@ -1,37 +1,51 @@
 import { doc, getDoc } from 'firebase/firestore'
-import { db } from '../firebase/config'
-
-import { CATEGORIES } from '../constants/categories'
+import { db, auth } from '../firebase/config'
 
 export async function getSmartCategory(note) {
 
-  const keyword = (note || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
-    .trim()
-    .split(' ')[0]
+  try {
 
-  if (!keyword) return null
+    if (!auth.currentUser || !note) return null
 
-  const snap = await getDoc(doc(db, 'userPatterns', keyword))
+    const keyword = note
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, '')
+      .trim()
+      .split(' ')[0]
 
-  if (!snap.exists()) return null
+    if (!keyword) return null
 
-  const data = snap.data()
+    const snap = await getDoc(
+      doc(db, 'userPatterns', keyword)
+    )
 
-  let bestCategory = null
-  let bestCount = 0
+    if (!snap.exists()) return null
 
-  for (const cat in data) {
+    const data = snap.data()
 
-    const count = data[cat]?.count || 0
+    let bestCategory = null
+    let bestCount = 0
 
-    if (count > bestCount) {
-      bestCount = count
-      bestCategory = cat
-    }
+    // FIX: safe iteration
+    Object.entries(data).forEach(([category, value]) => {
 
+      if (!value) return
+
+      const count = typeof value.count === 'number'
+        ? value.count
+        : 0
+
+      if (count > bestCount) {
+        bestCount = count
+        bestCategory = category
+      }
+
+    })
+
+    return bestCategory
+
+  } catch (error) {
+    console.error('Smart category error:', error)
+    return null
   }
-
-  return bestCategory
 }
