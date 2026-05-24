@@ -60,7 +60,7 @@ export async function scanReceipt(file) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
     // ========================
-    // DETECT AMOUNT
+    // DETECT AMOUNT (REPAIRED)
     // ========================
     let amount = '';
 
@@ -83,130 +83,67 @@ export async function scanReceipt(file) {
     // Only look for amounts BEFORE payment section
     const prePaymentLines = lines.slice(0, paymentStartIdx);
 
-    // Strategy 1 — find line with GRAND TOTAL keyword
+    // Strategy 1 — find line with GRAND TOTAL or TOTAL PAID keyword (Handles Comma Parsing)
     for (let i = 0; i < prePaymentLines.length; i++) {
       const lower = prePaymentLines[i].toLowerCase();
-      if (lower.includes('grand total')) {
-        // Check same line
-        const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/);
-        if (sameMatch) { amount = sameMatch[1]; break; }
-
-        // Check previous 3 lines (sideways receipt)
-        for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-          const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/);
-          if (match) { amount = match[1]; break; }
+      if (lower.includes('grand total') || lower.includes('total paid')) {
+        const sameMatch = prePaymentLines[i].match(/(\d{1,3}(?:\,\d{3})*\.\d{2})/);
+        if (sameMatch) { 
+          amount = sameMatch[1].replace(/,/g, ''); 
+          break; 
         }
-        if (amount) break;
 
-        // Check next 3 lines
+        // Check adjacent lines if sideways layout
         for (let j = i + 1; j <= Math.min(prePaymentLines.length - 1, i + 3); j++) {
-          const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/);
-          if (match) { amount = match[1]; break; }
+          const match = prePaymentLines[j].match(/^(\d{1,3}(?:\,\d{3})*\.\d{2})$/);
+          if (match) { amount = match[1].replace(/,/g, ''); break; }
         }
         if (amount) break;
       }
     }
 
-    // Strategy 2 — TOTAL AMOUNT or AMOUNT DUE
+    // Strategy 2 — TOTAL AMOUNT or AMOUNT DUE or JUMLAH
     if (!amount) {
       for (let i = 0; i < prePaymentLines.length; i++) {
         const lower = prePaymentLines[i].toLowerCase();
         if (lower.includes('total amount') || lower.includes('amount due') || lower.includes('jumlah')) {
-          const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/);
-          if (sameMatch) { amount = sameMatch[1]; break; }
-
-          for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-            const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/);
-            if (match) { amount = match[1]; break; }
-          }
-          if (amount) break;
-
-          for (let j = i + 1; j <= Math.min(prePaymentLines.length - 1, i + 3); j++) {
-            const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/);
-            if (match) { amount = match[1]; break; }
-          }
-          if (amount) break;
+          const sameMatch = prePaymentLines[i].match(/(\d{1,3}(?:\,\d{3})*\.\d{2})/);
+          if (sameMatch) { amount = sameMatch[1].replace(/,/g, ''); break; }
         }
       }
     }
 
-    // Strategy 3 — standalone TOTAL keyword
+    // Strategy 3 — Standalone RM Pattern Check (Reads bottom-up for final counters)
     if (!amount) {
-      for (let i = 0; i < prePaymentLines.length; i++) {
-        const lower = prePaymentLines[i].toLowerCase();
-        if (
-          lower === 'total' ||
-          lower.match(/^total\s*:?\s*$/) ||
-          (lower.includes('total') && !lower.includes('sub') && !lower.includes('qty'))
-        ) {
-          const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/);
-          if (sameMatch) { amount = sameMatch[1]; break; }
-
-          // For sideways receipts — amounts may be grouped together
-          const standaloneAmounts = [];
-          prePaymentLines.forEach(line => {
-            if (/^\d+\.\d{2}$/.test(line)) {
-              standaloneAmounts.push(parseFloat(line));
-            }
-          });
-
-          if (standaloneAmounts.length > 0) {
-            const validAmounts = standaloneAmounts.filter(a => a > 1);
-            if (validAmounts.length > 0) {
-              validAmounts.sort((a, b) => a - b);
-              amount = validAmounts.length > 1
-                ? validAmounts[validAmounts.length - 2].toFixed(2)
-                : validAmounts[validAmounts.length - 1].toFixed(2);
-
-              if (validAmounts.length > 1) {
-                const largest = validAmounts[validAmounts.length - 1];
-                const secondLargest = validAmounts[validAmounts.length - 2];
-                if (largest - secondLargest < 5) {
-                  amount = largest.toFixed(2);
-                }
-              }
-            }
-            break;
-          }
+      for (let i = prePaymentLines.length - 1; i >= 0; i--) {
+        const rmMatch = prePaymentLines[i].match(/rm\s*(\d{1,3}(?:\,\d{3})*\.\d{2})/i);
+        if (rmMatch) {
+          amount = rmMatch[1].replace(/,/g, '');
+          break;
         }
       }
     }
 
-    // Strategy 4 — collect all standalone amounts before payment
-    if (!amount) {
-      const standaloneAmounts = [];
-      prePaymentLines.forEach(line => {
-        if (/^\d+\.\d{2}$/.test(line)) {
-          const val = parseFloat(line);
-          if (val > 1) standaloneAmounts.push(val);
-        }
-      });
-
-      if (standaloneAmounts.length > 0) {
-        standaloneAmounts.sort((a, b) => a - b);
-        amount = standaloneAmounts[standaloneAmounts.length - 1].toFixed(2);
-      }
-    }
-
-    // Strategy 5 — RM pattern before payment section
-    if (!amount) {
-      const prePaymentClean = prePaymentLines.join(' ');
-      const rmMatch = prePaymentClean.match(/rm\s*(\d+\.\d{2})/i);
-      if (rmMatch) amount = rmMatch[1];
-    }
-
-    // Strategy 6 — absolute fallback from full text
+    // Strategy 4 — Absolute fallback matching all numbers containing commas
     if (!amount) {
       const allNums = [];
-      const allNumRegex = /(\d+\.\d{2})/g;
+      const allNumRegex = /(\d{1,3}(?:\,\d{3})*\.\d{2})/g;
       let m;
       while ((m = allNumRegex.exec(clean)) !== null) {
-        const val = parseFloat(m[1]);
+        const val = parseFloat(m[1].replace(/,/g, ''));
         if (val > 1) allNums.push(val);
       }
       if (allNums.length > 0) {
         allNums.sort((a, b) => a - b);
         amount = allNums[allNums.length - 1].toFixed(2);
+      }
+    }
+
+    // Remove unintended digits if tracking systems broke string fragments
+    if (amount && amount.includes('.')) {
+      const parts = amount.split('.');
+      if (parts[1].length > 2) {
+        amount = parseFloat(amount).toFixed(2);
       }
     }
 
@@ -302,7 +239,7 @@ export async function scanReceipt(file) {
     if (note.length > 50) note = note.substring(0, 50).trim();
 
     // ========================
-    // KEYWORD CATEGORY
+    // KEYWORD CATEGORY (REPAIRED)
     // ========================
     const lowerNote = note.toLowerCase();
     const lowerClean = clean.toLowerCase();
@@ -330,8 +267,11 @@ export async function scanReceipt(file) {
     else if (
       lowerNote.includes('pasaraya') || lowerNote.includes('supermarket') ||
       lowerNote.includes('market') || lowerNote.includes('store') ||
+      lowerNote.includes('xiaomi') || lowerNote.includes('shopee') ||
+      lowerNote.includes('lazada') || lowerNote.includes('gadget') ||
       lowerClean.includes('baju') || lowerClean.includes('shirt') ||
-      lowerClean.includes('jersey') || lowerClean.includes('clothes')
+      lowerClean.includes('jersey') || lowerClean.includes('clothes') ||
+      lowerClean.includes('smartphone') || lowerClean.includes('device')
     ) category = 'Shopping';
 
     else if (
