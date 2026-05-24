@@ -267,7 +267,8 @@ export async function scanReceipt(file) {
     else if (
       lowerNote.includes('pasaraya') || lowerNote.includes('supermarket') ||
       lowerNote.includes('market') || lowerNote.includes('store') ||
-      lowerNote.includes('xiaomi') || lowerNote.includes('shopee') ||
+      lowerNote.includes('xiaomi') || lowerNote.includes('iaomi') || 
+      lowerNote.includes('shopee') || lowerNote.includes('hopee') ||  
       lowerNote.includes('lazada') || lowerNote.includes('gadget') ||
       lowerClean.includes('baju') || lowerClean.includes('shirt') ||
       lowerClean.includes('jersey') || lowerClean.includes('clothes') ||
