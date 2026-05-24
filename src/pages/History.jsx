@@ -81,7 +81,7 @@ function History() {
 
   // ── EXPORT CSV with receipt image ──
   const exportCSV = () => {
-    const headers = ['Date', 'Category', 'Amount (RM)', 'Note', 'Receipt Image (Base64)']
+    const headers = ['Date', 'Category', 'Amount (RM)', 'Note', 'Receipt Image (URL)']
     const rows = filtered.map(e => [
       e.date,
       e.category,

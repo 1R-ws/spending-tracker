@@ -16,9 +16,12 @@ import { useNavigate } from 'react-router-dom'
 
 import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
+import { uploadReceiptImage } from '../utils/cloudinary'
+
 import { getSmartCategory } from '../utils/smartCategory'
 
 import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
+
 
 // compress image and convert to base64
 function compressImage(file, maxWidth = 800) {
@@ -93,48 +96,49 @@ function AddExpense() {
     setScanLoading(true)
 
     try {
-      // 1. Compress and save as base64
-      const base64 = await compressImage(file)
-      setReceiptBase64(base64)
-      setReceiptPreview(base64)
+      // 1. Show preview immediately
+      const reader = new FileReader()
+      reader.onload = (ev) => setReceiptPreview(ev.target.result)
+      reader.readAsDataURL(file)
 
-      // 2. Scan for expense data
+      // 2. Upload to Cloudinary — get real URL
+      const imageUrl = await uploadReceiptImage(file)
+      if (imageUrl) {
+        setReceiptBase64(imageUrl) // now stores URL not base64
+      }
+
+      // 3. Scan receipt for data
       const result = await scanReceipt(file)
 
-      if (!result) {
-        alert('No data detected')
-        setScanLoading(false)
-        return
-      }
+      if (result) {
+        setForm(prev => ({
+          ...prev,
+          amount: result.amount ? String(result.amount) : prev.amount,
+          note: result.note || prev.note,
+          category: result.category || prev.category
+        }))
 
-      setForm(prev => ({
-        ...prev,
-        amount: result.amount ? String(result.amount) : '',
-        note: result.note || '',
-        category: result.category || 'General'
-      }))
-
-      if (result.date) {
-        // handle dd/MM/yyyy format
-        const parts = result.date.split('/')
-        if (parts.length === 3) {
-          const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
-          if (!isNaN(d)) setSelectedDate(d)
+        if (result.date) {
+          const parts = result.date.split('/')
+          if (parts.length === 3) {
+            const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+            if (!isNaN(d)) setSelectedDate(d)
+          }
         }
+
+        alert(
+  `✅ Receipt scanned!
+
+  Amount: RM ${result.amount || 'Not detected'}
+  Category: ${result.category || 'Not detected'}
+  Note: ${result.note || 'Not detected'}
+  Date: ${result.date || 'Not detected'}`
+        )
       }
-
-      alert(
-`✅ Receipt scanned!
-
-Amount: RM ${result.amount || 'Not detected'}
-Category: ${result.category || 'Not detected'}
-Note: ${result.note || 'Not detected'}
-Date: ${result.date || 'Not detected'}`
-      )
 
     } catch (error) {
       console.error(error)
-      alert('Scan failed')
+      alert('Scan failed. Please try again.')
     }
 
     setScanLoading(false)
