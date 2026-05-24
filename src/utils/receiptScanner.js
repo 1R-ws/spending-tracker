@@ -1,25 +1,22 @@
 export async function scanReceipt(file) {
   try {
 
-    // Convert file to base64
     const base64 = await fileToBase64(file)
 
-    // ========================
-    // OCR.space API
-    // ========================
     const formData = new FormData()
     formData.append('base64Image', base64)
     formData.append('language', 'eng')
-    formData.append('OCREngine', '2') // Engine 2 is better for receipts
-    formData.append('isTable', 'true')
+    formData.append('OCREngine', '2')
+    formData.append('isTable', 'false')
     formData.append('detectOrientation', 'true')
+    formData.append('isCreateSearchablePdf', 'false')
+    formData.append('isSearchablePdfHideTextLayer', 'false')
     formData.append('scale', 'true')
+    formData.append('isOverlayRequired', 'false')
 
     const response = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
-      headers: {
-        'apikey': import.meta.env.VITE_OCR_API_KEY
-      },
+      headers: { 'apikey': import.meta.env.VITE_OCR_API_KEY },
       body: formData
     })
 
@@ -36,40 +33,170 @@ export async function scanReceipt(file) {
     const clean = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
     console.log('CLEAN TEXT:', clean)
 
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+
     // ========================
     // DETECT AMOUNT
     // ========================
-    const allAmounts = []
-    const allAmountRegex = /(\d+\.\d{2})/g
-    let m
-    while ((m = allAmountRegex.exec(clean)) !== null) {
-      allAmounts.push(parseFloat(m[1]))
-    }
 
     let amount = ''
 
-    const grandTotalMatch = clean.match(/grand\s*total[^0-9]*(\d+\.\d{2})/i)
-    const totalAmountMatch = clean.match(/total\s*amount[^0-9]*(\d+\.\d{2})/i)
-    const totalMatch = clean.match(/\btotal\b[^0-9]*(\d+\.\d{2})/i)
-    const rmMatch = clean.match(/rm\s*(\d+\.\d{2})/i)
+    // Payment keywords — amounts after these are NOT the total
+    const paymentKeywords = [
+      'cash', 'payment made', 'credit card', 'debit card',
+      'change', 'tender', 'visa', 'mastercard', 'ewallet',
+      'touch n go', 'boost', 'grabpay'
+    ]
 
-    if (grandTotalMatch) {
-      const gtVal = parseFloat(grandTotalMatch[1])
-      const maxAmt = allAmounts.length > 0 ? Math.max(...allAmounts) : 0
-      amount = gtVal >= maxAmt * 0.8 ? grandTotalMatch[1] : maxAmt.toFixed(2)
-    } else if (totalAmountMatch) {
-      amount = totalAmountMatch[1]
-    } else if (totalMatch) {
-      amount = totalMatch[1]
-    } else if (rmMatch) {
-      amount = rmMatch[1]
-    } else if (allAmounts.length > 0) {
-      amount = Math.max(...allAmounts).toFixed(2)
+    // Find index where payment section starts
+    let paymentStartIdx = lines.length
+    lines.forEach((line, idx) => {
+      const lower = line.toLowerCase()
+      if (paymentKeywords.some(k => lower.includes(k))) {
+        if (idx < paymentStartIdx) paymentStartIdx = idx
+      }
+    })
+
+    // Only look for amounts BEFORE payment section
+    const prePaymentLines = lines.slice(0, paymentStartIdx)
+
+    // Strategy 1 — find line with GRAND TOTAL keyword
+    for (let i = 0; i < prePaymentLines.length; i++) {
+      const lower = prePaymentLines[i].toLowerCase()
+      if (lower.includes('grand total')) {
+        // Check same line
+        const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/)
+        if (sameMatch) { amount = sameMatch[1]; break }
+
+        // Check previous 3 lines (sideways receipt)
+        for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
+          const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/)
+          if (match) { amount = match[1]; break }
+        }
+        if (amount) break
+
+        // Check next 3 lines
+        for (let j = i + 1; j <= Math.min(prePaymentLines.length - 1, i + 3); j++) {
+          const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/)
+          if (match) { amount = match[1]; break }
+        }
+        if (amount) break
+      }
+    }
+
+    // Strategy 2 — TOTAL AMOUNT or AMOUNT DUE
+    if (!amount) {
+      for (let i = 0; i < prePaymentLines.length; i++) {
+        const lower = prePaymentLines[i].toLowerCase()
+        if (lower.includes('total amount') || lower.includes('amount due') || lower.includes('jumlah')) {
+          const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/)
+          if (sameMatch) { amount = sameMatch[1]; break }
+
+          for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
+            const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/)
+            if (match) { amount = match[1]; break }
+          }
+          if (amount) break
+
+          for (let j = i + 1; j <= Math.min(prePaymentLines.length - 1, i + 3); j++) {
+            const match = prePaymentLines[j].match(/^(\d+\.\d{2})$/)
+            if (match) { amount = match[1]; break }
+          }
+          if (amount) break
+        }
+      }
+    }
+
+    // Strategy 3 — standalone TOTAL keyword
+    if (!amount) {
+      for (let i = 0; i < prePaymentLines.length; i++) {
+        const lower = prePaymentLines[i].toLowerCase()
+        if (
+          lower === 'total' ||
+          lower.match(/^total\s*:?\s*$/) ||
+          (lower.includes('total') && !lower.includes('sub') && !lower.includes('qty'))
+        ) {
+          const sameMatch = prePaymentLines[i].match(/(\d+\.\d{2})/)
+          if (sameMatch) { amount = sameMatch[1]; break }
+
+          // For sideways receipts — amounts may be grouped together
+          // Find the last standalone amount before payment section
+          const standaloneAmounts = []
+          prePaymentLines.forEach(line => {
+            if (/^\d+\.\d{2}$/.test(line)) {
+              standaloneAmounts.push(parseFloat(line))
+            }
+          })
+
+          if (standaloneAmounts.length > 0) {
+            // Filter out rounding (0.00, 0.10 etc) and unit prices
+            const validAmounts = standaloneAmounts.filter(a => a > 1)
+            if (validAmounts.length > 0) {
+              // Take the last valid amount before payment (usually the total)
+              // But not the absolute largest (could be cash given)
+              validAmounts.sort((a, b) => a - b)
+              // Take second largest if there are multiple, otherwise largest
+              amount = validAmounts.length > 1
+                ? validAmounts[validAmounts.length - 2].toFixed(2)
+                : validAmounts[validAmounts.length - 1].toFixed(2)
+
+              // But if second largest is much smaller than largest, use largest
+              if (validAmounts.length > 1) {
+                const largest = validAmounts[validAmounts.length - 1]
+                const secondLargest = validAmounts[validAmounts.length - 2]
+                if (largest - secondLargest < 5) {
+                  amount = largest.toFixed(2)
+                }
+              }
+            }
+            break
+          }
+        }
+      }
+    }
+
+    // Strategy 4 — collect all standalone amounts before payment
+    if (!amount) {
+      const standaloneAmounts = []
+      prePaymentLines.forEach(line => {
+        if (/^\d+\.\d{2}$/.test(line)) {
+          const val = parseFloat(line)
+          if (val > 1) standaloneAmounts.push(val)
+        }
+      })
+
+      if (standaloneAmounts.length > 0) {
+        standaloneAmounts.sort((a, b) => a - b)
+        amount = standaloneAmounts[standaloneAmounts.length - 1].toFixed(2)
+      }
+    }
+
+    // Strategy 5 — RM pattern before payment section
+    if (!amount) {
+      const prePaymentClean = prePaymentLines.join(' ')
+      const rmMatch = prePaymentClean.match(/rm\s*(\d+\.\d{2})/i)
+      if (rmMatch) amount = rmMatch[1]
+    }
+
+    // Strategy 6 — absolute fallback from full text
+    if (!amount) {
+      const allNums = []
+      const allNumRegex = /(\d+\.\d{2})/g
+      let m
+      while ((m = allNumRegex.exec(clean)) !== null) {
+        const val = parseFloat(m[1])
+        if (val > 1) allNums.push(val)
+      }
+      if (allNums.length > 0) {
+        allNums.sort((a, b) => a - b)
+        amount = allNums[allNums.length - 1].toFixed(2)
+      }
     }
 
     // ========================
     // DETECT DATE
     // ========================
+
     const datePatterns = [
       /(\d{2}\/\d{2}\/\d{4})/,
       /(\d{2}-\d{2}-\d{4})/,
@@ -86,7 +213,6 @@ export async function scanReceipt(file) {
     // ========================
     // DETECT SHOP NAME
     // ========================
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
 
     const blacklist = [
       'rm', 'cash', 'receipt', 'date', 'member', 'cashier',
@@ -96,7 +222,7 @@ export async function scanReceipt(file) {
       'item', 'price', 'discount', 'change', 'balance',
       'jalan', 'lorong', 'taman', 'seksyen', 'http', 'www',
       'bukit', 'rawang', 'selangor', 'kuala', 'lumpur',
-      'tax', 'gst', 'sst', 'reg', 'no.', 'fax'
+      'tax', 'gst', 'sst', 'reg', 'fax', 'no.'
     ]
 
     const businessKeywords = [
@@ -104,7 +230,8 @@ export async function scanReceipt(file) {
       'market', 'supermarket', 'restaurant', 'cafe', 'kedai',
       'holdings', 'industries', 'services', 'motor', 'auto',
       'pharmacy', 'clinic', 'hardware', 'construction',
-      'petrol', 'station', 'food', 'bakery', 'salon'
+      'petrol', 'station', 'food', 'bakery', 'salon',
+      'pasaraya', 'minimarket'
     ]
 
     let note = ''
@@ -150,11 +277,19 @@ export async function scanReceipt(file) {
     if (!note && lines.length > 0) note = lines[0]
 
     // Clean up
-    note = note.replace(/[^\w\s\-&()]/g, '').trim()
+    note = note
+      .replace(/ü/g, 'U')
+      .replace(/ö/g, 'O')
+      .replace(/ä/g, 'A')
+      .replace(/[^\w\s\-&()]/g, '')
+      .trim()
+    note = note.split('\t')[0].trim()
+    if (note.length > 50) note = note.substring(0, 50).trim()
 
     // ========================
     // KEYWORD CATEGORY
     // ========================
+
     const lowerNote = note.toLowerCase()
     const lowerClean = clean.toLowerCase()
     let category = 'General'
@@ -162,7 +297,7 @@ export async function scanReceipt(file) {
     if (
       lowerNote.includes('motor') || lowerNote.includes('workshop') ||
       lowerNote.includes('tyre') || lowerNote.includes('spare') ||
-      lowerNote.includes('auto') || lowerClean.includes('motor')
+      lowerNote.includes('auto') || lowerClean.includes('workshop')
     ) category = 'Maintenance'
 
     else if (
@@ -173,7 +308,7 @@ export async function scanReceipt(file) {
 
     else if (
       lowerNote.includes('restaurant') || lowerNote.includes('cafe') ||
-      lowerNote.includes('kedai makan') || lowerNote.includes('food') ||
+      lowerNote.includes('food') || lowerNote.includes('kedai makan') ||
       lowerClean.includes('nasi') || lowerClean.includes('roti') ||
       lowerClean.includes('mamak') || lowerClean.includes('makan')
     ) category = 'Food'
@@ -207,6 +342,7 @@ export async function scanReceipt(file) {
     // ========================
     // FINAL RESULT
     // ========================
+
     console.log('FINAL RESULT:', { amount, date, note, category })
     return { amount, date, note, category }
 
@@ -216,7 +352,6 @@ export async function scanReceipt(file) {
   }
 }
 
-// Convert file to base64
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
