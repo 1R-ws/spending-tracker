@@ -5,10 +5,7 @@ import 'react-datepicker/dist/react-datepicker.css'
 import {
   collection,
   addDoc,
-  serverTimestamp,
-  doc,
-  setDoc,
-  increment
+  serverTimestamp
 } from 'firebase/firestore'
 
 import { db, auth } from '../firebase/config'
@@ -18,7 +15,7 @@ import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { uploadReceiptImage } from '../utils/cloudinary'
 
-import { getSmartCategory } from '../utils/smartCategory'
+import { getSmartCategory, savePattern } from '../utils/smartCategory'
 
 import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
 
@@ -119,9 +116,13 @@ function AddExpense() {
         }))
 
         if (result.date) {
+          // Handle DD/MM/YYYY format from Malaysian receipts
           const parts = result.date.split('/')
           if (parts.length === 3) {
             const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+            if (!isNaN(d)) setSelectedDate(d)
+          } else {
+            const d = new Date(result.date)
             if (!isNaN(d)) setSelectedDate(d)
           }
         }
@@ -171,22 +172,8 @@ function AddExpense() {
         receiptImage: receiptBase64 || null
       })
 
-      // Smart memory learning
-      const keyword = (form.note || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9 ]/g, '')
-        .trim()
-      const memoryKey = keyword.split(' ')[0]
-
-      if (memoryKey) {
-        const ref = doc(db, 'userPatterns', memoryKey)
-        await setDoc(ref, {
-          [form.category]: {
-            count: increment(1),
-            lastUsed: serverTimestamp()
-          }
-        }, { merge: true })
-      }
+      // Save to both personal + global memory
+      await savePattern(form.note, form.category)
 
       alert('Expense added successfully!')
       navigate('/')
