@@ -5,27 +5,31 @@ import 'react-datepicker/dist/react-datepicker.css'
 import {
   collection,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  doc,
+  setDoc,
+  increment
 } from 'firebase/firestore'
 
 import { db, auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 
-// REPAIRED: Pointing to your active utility file (gemini.js) which houses categorizeExpense
 import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
-import { uploadReceiptImage } from '../utils/cloudinary'
+import { getSmartCategory } from '../utils/smartCategory'
 
-import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
+import {
+  CATEGORIES,
+  CATEGORY_ICONS
+} from '../constants/categories'
 
 function AddExpense() {
+
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [scanLoading, setScanLoading] = useState(false)
-  const [receiptBase64, setReceiptBase64] = useState(null)
-  const [receiptPreview, setReceiptPreview] = useState(null)
 
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -35,201 +39,249 @@ function AddExpense() {
     note: ''
   })
 
+  // =========================
+  // FORM CHANGE
+  // =========================
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value
+    })
   }
 
-  // ── AI CATEGORIZE (REPAIRED) ──
+  // =========================
+  // AI CATEGORIZE v2 (MEMORY FIRST)
+  // =========================
   const handleAICategorize = async () => {
+
     if (!form.note) {
       alert('Please enter a note first.')
       return
     }
-    
+
     setAiLoading(true)
+
     try {
-      // Calls your Gemini Flash model pipeline securely
-      const category = await categorizeExpense(form.note, form.amount)
-      if (category) {
-        setForm(prev => ({ ...prev, category }))
+
+      // 1. MEMORY FIRST (personal → global)
+      const smart = await getSmartCategory(form.note)
+
+      if (smart) {
+        setForm(prev => ({ ...prev, category: smart }))
+        setAiLoading(false)
+        return
       }
+
+      // 2. GEMINI FALLBACK
+      const category = await categorizeExpense(
+        form.note,
+        form.amount
+      )
+
+      setForm(prev => ({
+        ...prev,
+        category
+      }))
+
     } catch (error) {
-      console.error("Manual AI categorization sequence broke down:", error)
-      alert('AI failed to process the category configuration.')
+      console.error(error)
+      alert('AI failed')
     }
+
     setAiLoading(false)
   }
 
-  // ── RECEIPT SCAN + BASE64 ──
+  // =========================
+  // RECEIPT SCAN
+  // =========================
   const handleReceiptScan = async (e) => {
+
     const file = e.target.files[0]
     if (!file) return
 
     setScanLoading(true)
 
     try {
-      // 1. Show preview immediately
-      const reader = new FileReader()
-      reader.onload = (ev) => setReceiptPreview(ev.target.result)
-      reader.readAsDataURL(file)
 
-      // 2. Upload to Cloudinary — get real URL
-      const imageUrl = await uploadReceiptImage(file)
-      if (imageUrl) {
-        setReceiptBase64(imageUrl) 
-      }
-
-      // 3. Scan receipt for data using the optimized, compressed scanner pipeline
       const result = await scanReceipt(file)
 
-      if (result) {
-        setForm(prev => ({
-          ...prev,
-          amount: result.amount ? String(result.amount) : prev.amount,
-          note: result.note || prev.note,
-          category: result.category || prev.category
-        }))
+      if (!result) {
+        alert('No data detected')
+        setScanLoading(false)
+        return
+      }
 
-        if (result.date) {
-          // Handle DD/MM/YYYY format securely from Malaysian receipts
-          const parts = result.date.split('/')
-          if (parts.length === 3) {
-            const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
-            if (!isNaN(d)) setSelectedDate(d)
-          } else {
-            const d = new Date(result.date)
-            if (!isNaN(d)) setSelectedDate(d)
-          }
-        }
+      setForm(prev => ({
+        ...prev,
+        amount: result.amount ? String(result.amount) : '',
+        note: result.note || '',
+        category: result.category || 'Food'
+      }))
 
-        alert(
-`✅ Receipt scanned!
+      if (result.date) {
+        const d = new Date(result.date)
+        if (!isNaN(d)) setSelectedDate(d)
+      }
 
-Amount: RM ${result.amount || 'Not detected'}
+      alert(
+`Receipt scanned successfully!
+
+Amount: ${result.amount || 'Not detected'}
 Category: ${result.category || 'Not detected'}
 Note: ${result.note || 'Not detected'}
 Date: ${result.date || 'Not detected'}`
-        )
-      }
+      )
 
     } catch (error) {
-      console.error("The automated processing scan workflow failed:", error)
-      alert('Scan failed. Please try again.')
+      console.error(error)
+      alert('Scan failed')
     }
 
     setScanLoading(false)
   }
 
-  // ── REMOVE RECEIPT ──
-  const handleRemoveReceipt = () => {
-    setReceiptBase64(null)
-    setReceiptPreview(null)
-  }
-
-  // ── SAVE EXPENSE (REPAIRED FILTERS) ──
+  // =========================
+  // SAVE + MEMORY LEARNING (Option C: Global + Personal)
+  // =========================
   const handleSubmit = async () => {
+
     if (!form.amount || Number(form.amount) <= 0) {
       alert('Invalid amount')
-      return
-    }
-
-    if (!auth.currentUser) {
-      alert('Your authentication credentials expired. Please re-login.')
       return
     }
 
     setLoading(true)
 
     try {
-      // Save expense into Firestore ensuring rule matches (uid must exist)
+
+      const uid = auth.currentUser?.uid
+
+      // 1. SAVE EXPENSE
       await addDoc(collection(db, 'expenses'), {
         amount: parseFloat(form.amount),
         category: form.category,
         note: form.note,
         date: selectedDate.toISOString().slice(0, 10),
-        uid: auth.currentUser.uid, // Explicit matching across security configurations
-        createdAt: serverTimestamp(),
-        receiptImage: receiptBase64 || null
+        uid,
+        createdAt: serverTimestamp()
       })
+
+      // 2. EXTRACT MEMORY KEY
+      const keyword = (form.note || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, '')
+        .trim()
+        .split(' ')[0]
+
+      if (keyword && uid) {
+
+        const categoryUpdate = {
+          [form.category]: {
+            count: increment(1),
+            lastUsed: serverTimestamp()
+          }
+        }
+
+        // 3A. PERSONAL MEMORY  →  userPatterns/{uid}_{keyword}
+        //     Firestore rule: patternId.startsWith(uid + "_")  ✅
+        await setDoc(
+          doc(db, 'userPatterns', `${uid}_${keyword}`),
+          categoryUpdate,
+          { merge: true }
+        )
+
+        // 3B. GLOBAL COMMUNITY MEMORY  →  globalPatterns/{keyword}
+        //     Firestore rule: any authenticated user can read/write  ✅
+        await setDoc(
+          doc(db, 'globalPatterns', keyword),
+          categoryUpdate,
+          { merge: true }
+        )
+
+      }
 
       alert('Expense added successfully!')
       navigate('/')
 
     } catch (error) {
-      console.error("Firestore database layout write rejection:", error)
-      alert('Failed to save expense due to background sync constraints.')
+      console.error(error)
+      alert('Failed to save expense')
     }
 
     setLoading(false)
   }
 
   return (
+
     <div className="page-container">
+
       <h2 className="page-title">➕ Add Expense</h2>
 
       <div className="form-card">
 
-        {/* SCAN RECEIPT */}
+        {/* SCAN */}
         <div className="form-group">
-          <label>📷 Scan Receipt (optional)</label>
+          <label>Scan Receipt</label>
 
-          {!receiptPreview ? (
-            <div className="receipt-upload-box">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleReceiptScan}
-                id="receipt-input"
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="receipt-input" className="receipt-upload-label">
-                {scanLoading ? '🔍 Scanning...' : '📷 Upload Receipt'}
-              </label>
-            </div>
-          ) : (
-            <div className="receipt-preview-wrap">
-              <img src={receiptPreview} alt="Receipt" className="receipt-preview-img" />
-              <button className="receipt-remove-btn" onClick={handleRemoveReceipt}>✕ Remove</button>
-            </div>
-          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleReceiptScan}
+          />
+
+          {scanLoading && <small>Scanning...</small>}
         </div>
 
         {/* AMOUNT */}
         <div className="form-group">
           <label>Amount (RM)</label>
+
           <input
             type="number"
             name="amount"
             value={form.amount}
             onChange={handleChange}
             step="0.01"
-            placeholder="0.00"
           />
         </div>
 
         {/* NOTE + AI */}
         <div className="form-group">
           <label>Note</label>
+
           <div style={{ display: 'flex', gap: 8 }}>
+
             <input
               name="note"
               value={form.note}
               onChange={handleChange}
-              placeholder="e.g. lunch at mamak"
               style={{ flex: 1 }}
             />
-            <button className="ai-btn" onClick={handleAICategorize} disabled={aiLoading}>
-              {aiLoading ? '...' : '🤖 AI'}
+
+            <button
+              className="ai-btn"
+              onClick={handleAICategorize}
+              disabled={aiLoading}
+            >
+              {aiLoading ? '...' : 'AI'}
             </button>
+
           </div>
         </div>
 
         {/* CATEGORY */}
         <div className="form-group">
           <label>Category</label>
-          <select name="category" value={form.category} onChange={handleChange}>
+
+          <select
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+          >
             {CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat}</option>
+              <option key={cat} value={cat}>
+                {CATEGORY_ICONS[cat]} {cat}
+              </option>
             ))}
           </select>
         </div>
@@ -237,21 +289,25 @@ Date: ${result.date || 'Not detected'}`
         {/* DATE */}
         <div className="form-group">
           <label>Date</label>
+
           <DatePicker
             selected={selectedDate}
             onChange={setSelectedDate}
             maxDate={new Date()}
-            dateFormat="dd/MM/yyyy"
-            className="datepicker-input"
           />
         </div>
 
         {/* SAVE */}
-        <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
+        <button
+          className="btn-primary"
+          onClick={handleSubmit}
+          disabled={loading}
+        >
           {loading ? 'Saving...' : '+ Add Expense'}
         </button>
 
       </div>
+
     </div>
   )
 }
