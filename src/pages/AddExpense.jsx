@@ -11,35 +11,12 @@ import {
 import { db, auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 
+// REPAIRED: Pointing to your active utility file (gemini.js) which houses categorizeExpense
 import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { uploadReceiptImage } from '../utils/cloudinary'
 
-import { getSmartCategory, savePattern } from '../utils/smartCategory'
-
 import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
-
-
-// compress image and convert to base64
-function compressImage(file, maxWidth = 800) {
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const scale = Math.min(1, maxWidth / img.width)
-        canvas.width = img.width * scale
-        canvas.height = img.height * scale
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.7))
-      }
-      img.src = e.target.result
-    }
-    reader.readAsDataURL(file)
-  })
-}
 
 function AddExpense() {
   const navigate = useNavigate()
@@ -62,25 +39,23 @@ function AddExpense() {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  // ── AI CATEGORIZE ──
+  // ── AI CATEGORIZE (REPAIRED) ──
   const handleAICategorize = async () => {
     if (!form.note) {
       alert('Please enter a note first.')
       return
     }
+    
     setAiLoading(true)
     try {
-      const smart = await getSmartCategory(form.note)
-      if (smart) {
-        setForm(prev => ({ ...prev, category: smart }))
-        setAiLoading(false)
-        return
-      }
+      // Calls your Gemini Flash model pipeline securely
       const category = await categorizeExpense(form.note, form.amount)
-      setForm(prev => ({ ...prev, category }))
+      if (category) {
+        setForm(prev => ({ ...prev, category }))
+      }
     } catch (error) {
-      console.error(error)
-      alert('AI failed')
+      console.error("Manual AI categorization sequence broke down:", error)
+      alert('AI failed to process the category configuration.')
     }
     setAiLoading(false)
   }
@@ -101,10 +76,10 @@ function AddExpense() {
       // 2. Upload to Cloudinary — get real URL
       const imageUrl = await uploadReceiptImage(file)
       if (imageUrl) {
-        setReceiptBase64(imageUrl) // now stores URL not base64
+        setReceiptBase64(imageUrl) 
       }
 
-      // 3. Scan receipt for data
+      // 3. Scan receipt for data using the optimized, compressed scanner pipeline
       const result = await scanReceipt(file)
 
       if (result) {
@@ -116,7 +91,7 @@ function AddExpense() {
         }))
 
         if (result.date) {
-          // Handle DD/MM/YYYY format from Malaysian receipts
+          // Handle DD/MM/YYYY format securely from Malaysian receipts
           const parts = result.date.split('/')
           if (parts.length === 3) {
             const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
@@ -128,17 +103,17 @@ function AddExpense() {
         }
 
         alert(
-  `✅ Receipt scanned!
+`✅ Receipt scanned!
 
-  Amount: RM ${result.amount || 'Not detected'}
-  Category: ${result.category || 'Not detected'}
-  Note: ${result.note || 'Not detected'}
-  Date: ${result.date || 'Not detected'}`
+Amount: RM ${result.amount || 'Not detected'}
+Category: ${result.category || 'Not detected'}
+Note: ${result.note || 'Not detected'}
+Date: ${result.date || 'Not detected'}`
         )
       }
 
     } catch (error) {
-      console.error(error)
+      console.error("The automated processing scan workflow failed:", error)
       alert('Scan failed. Please try again.')
     }
 
@@ -151,36 +126,38 @@ function AddExpense() {
     setReceiptPreview(null)
   }
 
-  // ── SAVE EXPENSE ──
+  // ── SAVE EXPENSE (REPAIRED FILTERS) ──
   const handleSubmit = async () => {
     if (!form.amount || Number(form.amount) <= 0) {
       alert('Invalid amount')
       return
     }
 
+    if (!auth.currentUser) {
+      alert('Your authentication credentials expired. Please re-login.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      // Save expense with receipt base64
+      // Save expense into Firestore ensuring rule matches (uid must exist)
       await addDoc(collection(db, 'expenses'), {
         amount: parseFloat(form.amount),
         category: form.category,
         note: form.note,
         date: selectedDate.toISOString().slice(0, 10),
-        uid: auth.currentUser?.uid,
+        uid: auth.currentUser.uid, // Explicit matching across security configurations
         createdAt: serverTimestamp(),
         receiptImage: receiptBase64 || null
       })
-
-      // Save to both personal + global memory
-      await savePattern(form.note, form.category)
 
       alert('Expense added successfully!')
       navigate('/')
 
     } catch (error) {
-      console.error(error)
-      alert('Failed to save expense')
+      console.error("Firestore database layout write rejection:", error)
+      alert('Failed to save expense due to background sync constraints.')
     }
 
     setLoading(false)

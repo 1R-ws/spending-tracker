@@ -1,8 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(
-  import.meta.env.VITE_GEMINI_API_KEY
-)
+// Initialize using the environment variable token string securely
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY)
+// 2. Fetch via secure Header Authentication channel targeting the modern flagship model path
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+    
+// REPAIRED: Swapped model target path string to unblock tier access routes
+const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent`
 
 export const CATEGORIES = [
   'Food',
@@ -19,9 +23,7 @@ export const CATEGORIES = [
   'General'
 ]
 
-// Keyword matching first
 const KEYWORDS = {
-
   Food: [
     'mcd', 'kfc', 'burger', 'pizza', 'nasi',
     'ayam', 'mamak', 'tealive', 'starbucks',
@@ -52,7 +54,8 @@ const KEYWORDS = {
     'tablet', 'charger', 'usb',
     'headphone', 'earbuds', 'powerbank',
     'electronic', 'gadgets', 'mall',
-    'aeon', 'mid valley', 'sunway'
+    'aeon', 'mid valley', 'sunway',
+    'iaomi', 'xiaomi', 'hopee'
   ],
 
   Bills: [
@@ -122,99 +125,70 @@ const KEYWORDS = {
     'mechanic', 'motor service',
     'alignment', 'balancing'
   ]
-
 }
 
-
-export async function categorizeExpense(
-  note,
-  amount
-) {
-
+export async function categorizeExpense(note, amount) {
   try {
+    const lowerNote = (note || '').toLowerCase().trim()
 
-    const lowerNote = (note || '')
-      .toLowerCase()
-      .trim()
-
-    // Empty note
     if (!lowerNote) {
       return 'General'
     }
 
-    // 1. Keyword matching first
+    // 1. Check local keywords first
     for (const category in KEYWORDS) {
-
-      const matched =
-        KEYWORDS[category].some(keyword =>
-          lowerNote.includes(keyword)
-        )
-
-      if (matched) {
-        return category
-      }
-
+      const matched = KEYWORDS[category].some(keyword =>
+        lowerNote.includes(keyword)
+      )
+      if (matched) return category
     }
 
-    // 2. Fallback to Gemini AI
-    const model =
-      genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash'
-      })
+    // 2. Fetch via secure Header Authentication channel
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+    
+    // Updated route path to handle active free tier system models
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent`
 
     const prompt = `
 You are a spending categorizer.
+Choose ONLY ONE category from this list: [${CATEGORIES.join(', ')}]
 
-Choose ONLY ONE category from this list:
-
-${CATEGORIES.join(', ')}
-
-Expense note:
-"${note}"
-
-Amount:
-RM ${amount}
+Expense note: "${note}"
+Amount: RM ${amount}
 
 Rules:
-- Reply ONLY the category name
-- No explanation
-- No symbols
-- No extra text
-
-Examples:
-"Nasi lemak" = Food
-"Shell petrol" = Fuel
-"Netflix" = Entertainment
-"Uniqlo shirt" = Clothes
-"TNB bill" = Bills
+- Reply ONLY with the exact category name word from the list.
+- No explanation, no punctuation, no extra formatting.
 `
 
-    const result =
-      await model.generateContent(prompt)
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    })
 
-    const text = result.response
-      .text()
-      .trim()
-      .replace(/[^\w\s]/g, '')
-
-    const normalized = CATEGORIES.find(
-      c => c.toLowerCase() === text.toLowerCase()
-    )
-    if (normalized) {
-      return normalized
+    if (!response.ok) {
+      throw new Error(`Gemini HTTP Error Status: ${response.status}`)
     }
 
-    return 'General'
+    const data = await response.json()
+    
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const text = rawText.trim().replace(/[^\w\s]/g, '')
+
+    const normalized = CATEGORIES.find(
+      c => c.toLowerCase() === text.toLowerCase().trim()
+    )
+    
+    return normalized || 'General'
 
   } catch (error) {
-
-    console.error(
-      'Gemini categorize error:',
-      error
-    )
-
+    console.error('Gemini classification fallback failure:', error)
     return 'General'
-
   }
-
 }

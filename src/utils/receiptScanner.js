@@ -1,5 +1,15 @@
 import imageCompression from 'browser-image-compression';
 
+// Helper function placed at the top to ensure clean scoping
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function scanReceipt(file) {
   try {
     console.log(`Original image size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
@@ -60,7 +70,7 @@ export async function scanReceipt(file) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
     // ========================
-    // DETECT AMOUNT (REPAIRED)
+    // DETECT AMOUNT
     // ========================
     let amount = '';
 
@@ -228,7 +238,7 @@ export async function scanReceipt(file) {
     // Fallback
     if (!note && lines.length > 0) note = lines[0];
 
-    // Clean up
+    // Clean up typos / character glitches
     note = note
       .replace(/ü/g, 'U')
       .replace(/ö/g, 'O')
@@ -239,7 +249,7 @@ export async function scanReceipt(file) {
     if (note.length > 50) note = note.substring(0, 50).trim();
 
     // ========================
-    // KEYWORD CATEGORY (REPAIRED)
+    // KEYWORD CATEGORY
     // ========================
     const lowerNote = note.toLowerCase();
     const lowerClean = clean.toLowerCase();
@@ -304,13 +314,4 @@ export async function scanReceipt(file) {
     console.error('Scanner error:', error);
     return { amount: '', date: '', note: '', category: 'General' };
   }
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }

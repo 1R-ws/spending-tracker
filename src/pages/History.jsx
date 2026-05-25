@@ -10,10 +10,6 @@ import { exportToExcel } from '../utils/exportExcel'
 function History() {
   const { expenses, loading } = useExpenses()
 
-  const handleExportExcel = () => {
-  exportToExcel(filtered, `spending-${filterMonth || 'all'}`)
-}
-
   const [filterCat, setFilterCat] = useState('All')
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
   const [viewReceipt, setViewReceipt] = useState(null)
@@ -23,6 +19,17 @@ function History() {
   const [editForm, setEditForm] = useState({})
   const [editDate, setEditDate] = useState(new Date())
   const [saveLoading, setSaveLoading] = useState(false)
+
+  // ── 1. FILTERED DATA DEFINED AT THE TOP ──
+  const filtered = expenses
+    .filter(e => !filterMonth || e.date?.startsWith(filterMonth))
+    .filter(e => filterCat === 'All' || e.category === filterCat)
+    .sort((a, b) => b.date?.localeCompare(a.date))
+
+  // ── EXPORT EXCEL HANDLER SCOPE (Reads 'filtered' cleanly now) ──
+  const handleExportExcel = () => {
+    exportToExcel(filtered, `spending-${filterMonth || 'all'}`)
+  }
 
   // ── DELETE ──
   const handleDelete = async (id) => {
@@ -72,12 +79,6 @@ function History() {
     }
     setSaveLoading(false)
   }
-
-  // ── FILTER ──
-  const filtered = expenses
-    .filter(e => !filterMonth || e.date?.startsWith(filterMonth))
-    .filter(e => filterCat === 'All' || e.category === filterCat)
-    .sort((a, b) => b.date?.localeCompare(a.date))
 
   // ── EXPORT CSV with receipt image ──
   const exportCSV = () => {
