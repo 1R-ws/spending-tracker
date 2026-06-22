@@ -294,6 +294,7 @@ Date: ${result.date || 'Not detected'}`
             selected={selectedDate}
             onChange={setSelectedDate}
             maxDate={new Date()}
+            dateFormat="dd/MM/yyyy"
           />
         </div>
 

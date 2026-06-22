@@ -172,6 +172,13 @@ export async function scanReceipt(file) {
       const match = clean.match(pattern);
       if (match) { date = match[1]; break; }
     }
+    if (date) {
+    const parts = date.split(/[\/\-]/);
+    if (parts.length === 3 && parts[2].length === 4) {
+      // Assume DD/MM/YYYY format (Malaysian receipts)
+      date = `${parts[2]}-${parts[1]}-${parts[0]}`; // → 2026-06-12
+    }
+  }
 
     // ========================
     // DETECT SHOP NAME
