@@ -219,12 +219,11 @@
 .btn-save {
   flex: 1;
   padding: 10px;
-  border: none;
+  border: 1.5px solid var(--border);
   border-radius: 10px;
-  background: var(--primary);
-  color: white;
+  background: transparent;
+  color: var(--text-soft);
   font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
 }
