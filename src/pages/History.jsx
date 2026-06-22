@@ -70,7 +70,7 @@ function History() {
         amount: parseFloat(editForm.amount),
         category: editForm.category,
         note: editForm.note,
-        date: editDate.toISOString().slice(0, 10)
+        date: `${editDate.getFullYear()}-${String(editDate.getMonth() + 1).padStart(2, '0')}-${String(editDate.getDate()).padStart(2, '0')}`
       })
       setEditingId(null)
     } catch (error) {
