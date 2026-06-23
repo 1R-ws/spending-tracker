@@ -8,7 +8,10 @@ function getInitialDarkMode() {
   const saved = localStorage.getItem('theme')
   if (saved === 'dark') return true
   if (saved === 'light') return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
+  
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  localStorage.setItem('theme', prefersDark ? 'dark' : 'light')
+  return prefersDark
 }
 
 function Navbar() {
