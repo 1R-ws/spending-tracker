@@ -138,13 +138,6 @@ function AddExpense() {
   return (
     <div className="ae-root">
 
-      {/* BACK HEADER */}
-      <div className="ae-header">
-        <button className="ae-back" onClick={() => navigate('/')} aria-label="Go back">
-          ←
-        </button>
-        <span className="ae-title">Add expense</span>
-      </div>
 
       <div className="ae-body">
 
