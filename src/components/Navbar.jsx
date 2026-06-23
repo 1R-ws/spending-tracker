@@ -6,11 +6,13 @@ import '../styles/navbar.css'
 
 function Navbar() {
   const navigate = useNavigate()
+  // Default is LIGHT unless user explicitly saved 'dark' before
   const [darkMode, setDarkMode] = useState(
-    () => document.documentElement.classList.contains('dark')
+    () => localStorage.getItem('theme') === 'dark'
   )
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
+  // Apply class whenever darkMode changes
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark')
@@ -20,14 +22,6 @@ function Navbar() {
       localStorage.setItem('theme', 'light')
     }
   }, [darkMode])
-
-  useEffect(() => {
-    const saved = localStorage.getItem('theme')
-    if (saved === 'dark') {
-      setDarkMode(true)
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
 
   const handleLogoutConfirm = async () => {
     await signOut(auth)
@@ -78,7 +72,7 @@ function Navbar() {
           to="/budget"
           className={({ isActive }) => `nb-nav-item${isActive ? ' active' : ''}`}
         >
-          <span className="nb-nav-icon">💰</span>
+          <span className="nb-nav-icon">📊</span>
           <span className="nb-nav-label">Budget</span>
         </NavLink>
 
