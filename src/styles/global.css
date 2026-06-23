@@ -50,13 +50,6 @@ html.dark body {
   min-height: 100vh;
 }
 
-/* Support iPhone notch / home bar */
-@supports (padding: env(safe-area-inset-top)) {
-  .app-main {
-    padding-top: calc(56px + env(safe-area-inset-top));
-  }
-}
-
 /* Tap highlight off globally */
 * {
   -webkit-tap-highlight-color: transparent;
