@@ -4,15 +4,19 @@ import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import '../styles/navbar.css'
 
+function getInitialDarkMode() {
+  const saved = localStorage.getItem('theme')
+  if (saved === 'dark') return true
+  if (saved === 'light') return false
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
 function Navbar() {
   const navigate = useNavigate()
-  // Default is LIGHT unless user explicitly saved 'dark' before
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem('theme') === 'dark'
-  )
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
-  // Apply class whenever darkMode changes
+  // Apply dark class whenever darkMode changes
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark')
@@ -22,6 +26,15 @@ function Navbar() {
       localStorage.setItem('theme', 'light')
     }
   }, [darkMode])
+
+  // Restore saved theme on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('theme')
+    if (saved === 'dark') {
+      setDarkMode(true)
+      document.documentElement.classList.add('dark')
+    }
+  }, [])
 
   const handleLogoutConfirm = async () => {
     await signOut(auth)
@@ -88,7 +101,6 @@ function Navbar() {
           <span className="nb-nav-label">History</span>
         </NavLink>
 
-        {/* LOGOUT — opens modal */}
         <button
           className="nb-nav-item"
           onClick={() => setShowLogoutModal(true)}
