@@ -1,117 +1,83 @@
-* {
+/* =============================================
+   GLOBAL — resets + shared tokens
+   ============================================= */
+
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* Restore theme before first render */
+html.dark {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+               Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* prevent pull-to-refresh fighting scroll */
+  overscroll-behavior-y: contain;
+}
+
 body {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
-  background: #f3f4f6;
-  color: #1f2937;
+  background: #f5f6fa;
+  color: #111827;
 }
 
-.container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  font-size: 18px;
-}
-
-.page-container {
-  padding: 1.5rem 0;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  color: #333;
-}
-
-.form-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-
-.empty {
-  text-align: center;
-  padding: 2rem;
-  color: #aaa;
-  font-size: 14px;
-}
-
-.cat-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-body.dark {
+html.dark body {
   background: #0f172a;
   color: #f1f5f9;
 }
 
-body.dark .navbar,
-body.dark .form-card,
-body.dark .chart-card,
-body.dark .metric-card,
-body.dark .login-card {
-  background: #111827;
-  border-color: #1f2937;
+/* App shell */
+.app-loading {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #6b7280;
 }
 
-body.dark .page-title,
-body.dark .chart-title,
-body.dark .metric-value,
-body.dark .expense-name,
-body.dark .nav-brand {
-  color: #f9fafb;
+/* Sits below sticky topbar, above fixed bottom nav */
+.app-main {
+  /* topbar height — update if you change nb-topbar height */
+  padding-top: 56px;
+  min-height: 100vh;
 }
 
-body.dark .metric-label,
-body.dark .expense-meta,
-body.dark .budget-amounts,
-body.dark .legend-item,
-body.dark .form-group label {
-  color: #9ca3af;
+/* Support iPhone notch / home bar */
+@supports (padding: env(safe-area-inset-top)) {
+  .app-main {
+    padding-top: calc(56px + env(safe-area-inset-top));
+  }
 }
 
-body.dark input,
-body.dark select,
-body.dark .datepicker-input {
-  background: #1f2937;
-  border-color: #374151;
-  color: white;
+/* Tap highlight off globally */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
-body.dark .expense-item {
-  background: #1e293b;
+/* Native-feeling scrolling on iOS */
+* {
+  -webkit-overflow-scrolling: touch;
 }
 
-body.dark .expense-item:hover {
-  background: #334155;
+/* Remove default button/input styles */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
 }
 
-body.dark .nav-links a {
-  color: #cbd5e1;
+button {
+  cursor: pointer;
 }
 
-body.dark .nav-links a:hover {
-  background: #312e81;
-  color: white;
-}
-
-body.dark .export-btn {
-  background: #1e293b;
-  color: white;
+a {
+  text-decoration: none;
+  color: inherit;
 }

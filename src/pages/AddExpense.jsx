@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
-
 import {
   collection,
   addDoc,
@@ -10,28 +9,22 @@ import {
   setDoc,
   increment
 } from 'firebase/firestore'
-
 import { db, auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
-
 import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { getSmartCategory } from '../utils/smartCategory'
-
-import {
-  CATEGORIES,
-  CATEGORY_ICONS
-} from '../constants/categories'
+import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
+import '../styles/addexpense.css'
 
 function AddExpense() {
-
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [scanLoading, setScanLoading] = useState(false)
-
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [receiptPreview, setReceiptPreview] = useState(null)
 
   const [form, setForm] = useState({
     amount: '',
@@ -39,124 +32,75 @@ function AddExpense() {
     note: ''
   })
 
-  // =========================
-  // FORM CHANGE
-  // =========================
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    })
+    setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  // =========================
-  // AI CATEGORIZE v2 (MEMORY FIRST)
-  // =========================
   const handleAICategorize = async () => {
-
     if (!form.note) {
       alert('Please enter a note first.')
       return
     }
-
     setAiLoading(true)
-
     try {
-
-      // 1. MEMORY FIRST (personal → global)
       const smart = await getSmartCategory(form.note)
-
       if (smart) {
         setForm(prev => ({ ...prev, category: smart }))
         setAiLoading(false)
         return
       }
-
-      // 2. GEMINI FALLBACK
-      const category = await categorizeExpense(
-        form.note,
-        form.amount
-      )
-
-      setForm(prev => ({
-        ...prev,
-        category
-      }))
-
+      const category = await categorizeExpense(form.note, form.amount)
+      setForm(prev => ({ ...prev, category }))
     } catch (error) {
       console.error(error)
-      alert('AI failed')
+      alert('AI categorization failed.')
     }
-
     setAiLoading(false)
   }
 
-  // =========================
-  // RECEIPT SCAN
-  // =========================
   const handleReceiptScan = async (e) => {
-
     const file = e.target.files[0]
     if (!file) return
 
+    setReceiptPreview(URL.createObjectURL(file))
     setScanLoading(true)
 
     try {
-
       const result = await scanReceipt(file)
-
       if (!result) {
-        alert('No data detected')
+        alert('No data detected.')
         setScanLoading(false)
         return
       }
-
       setForm(prev => ({
         ...prev,
         amount: result.amount ? String(result.amount) : '',
         note: result.note || '',
         category: result.category || 'Food'
       }))
-
       if (result.date) {
         const d = new Date(result.date)
         if (!isNaN(d)) setSelectedDate(d)
       }
-
-      alert(
-`Receipt scanned successfully!
-
-Amount: ${result.amount || 'Not detected'}
-Category: ${result.category || 'Not detected'}
-Note: ${result.note || 'Not detected'}
-Date: ${result.date || 'Not detected'}`
-      )
-
     } catch (error) {
       console.error(error)
-      alert('Scan failed')
+      alert('Scan failed.')
     }
-
     setScanLoading(false)
   }
 
-  // =========================
-  // SAVE + MEMORY LEARNING (Option C: Global + Personal)
-  // =========================
-  const handleSubmit = async () => {
+  const handleRemoveReceipt = () => {
+    setReceiptPreview(null)
+  }
 
+  const handleSubmit = async () => {
     if (!form.amount || Number(form.amount) <= 0) {
-      alert('Invalid amount')
+      alert('Please enter a valid amount.')
       return
     }
-
     setLoading(true)
-
     try {
-
       const uid = auth.currentUser?.uid
-
-      // 1. SAVE EXPENSE
       await addDoc(collection(db, 'expenses'), {
         amount: parseFloat(form.amount),
         category: form.category,
@@ -166,7 +110,6 @@ Date: ${result.date || 'Not detected'}`
         createdAt: serverTimestamp()
       })
 
-      // 2. EXTRACT MEMORY KEY
       const keyword = (form.note || '')
         .toLowerCase()
         .replace(/[^a-z0-9 ]/g, '')
@@ -174,141 +117,147 @@ Date: ${result.date || 'Not detected'}`
         .split(' ')[0]
 
       if (keyword && uid) {
-
         const categoryUpdate = {
           [form.category]: {
             count: increment(1),
             lastUsed: serverTimestamp()
           }
         }
-
-        // 3A. PERSONAL MEMORY  →  userPatterns/{uid}_{keyword}
-        //     Firestore rule: patternId.startsWith(uid + "_")  ✅
-        await setDoc(
-          doc(db, 'userPatterns', `${uid}_${keyword}`),
-          categoryUpdate,
-          { merge: true }
-        )
-
-        // 3B. GLOBAL COMMUNITY MEMORY  →  globalPatterns/{keyword}
-        //     Firestore rule: any authenticated user can read/write  ✅
-        await setDoc(
-          doc(db, 'globalPatterns', keyword),
-          categoryUpdate,
-          { merge: true }
-        )
-
+        await setDoc(doc(db, 'userPatterns', `${uid}_${keyword}`), categoryUpdate, { merge: true })
+        await setDoc(doc(db, 'globalPatterns', keyword), categoryUpdate, { merge: true })
       }
 
-      alert('Expense added successfully!')
       navigate('/')
-
     } catch (error) {
       console.error(error)
-      alert('Failed to save expense')
+      alert('Failed to save expense.')
     }
-
     setLoading(false)
   }
 
   return (
+    <div className="ae-root">
 
-    <div className="page-container">
+      {/* BACK HEADER */}
+      <div className="ae-header">
+        <button className="ae-back" onClick={() => navigate('/')} aria-label="Go back">
+          ←
+        </button>
+        <span className="ae-title">Add expense</span>
+      </div>
 
-      <h2 className="page-title">➕ Add Expense</h2>
+      <div className="ae-body">
 
-      <div className="form-card">
-
-        {/* SCAN */}
-        <div className="form-group">
-          <label>Scan Receipt</label>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleReceiptScan}
-          />
-
-          {scanLoading && <small>Scanning...</small>}
-        </div>
+        {/* SCAN ZONE */}
+        {!receiptPreview ? (
+          <label className={`ae-scan-zone${scanLoading ? ' scanning' : ''}`}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleReceiptScan}
+              style={{ display: 'none' }}
+            />
+            <span className="ae-scan-icon">📷</span>
+            <span className="ae-scan-label">
+              {scanLoading ? 'Scanning receipt…' : 'Scan receipt'}
+            </span>
+            <span className="ae-scan-hint">
+              {scanLoading ? 'Please wait' : 'Tap to auto-fill from photo'}
+            </span>
+          </label>
+        ) : (
+          <div className="ae-preview-wrap">
+            <img src={receiptPreview} alt="Receipt preview" className="ae-preview-img" />
+            {scanLoading && <div className="ae-scan-overlay">Scanning…</div>}
+            {!scanLoading && (
+              <button className="ae-remove-btn" onClick={handleRemoveReceipt}>
+                Remove receipt
+              </button>
+            )}
+          </div>
+        )}
 
         {/* AMOUNT */}
-        <div className="form-group">
-          <label>Amount (RM)</label>
-
-          <input
-            type="number"
-            name="amount"
-            value={form.amount}
-            onChange={handleChange}
-            step="0.01"
-          />
-        </div>
-
-        {/* NOTE + AI */}
-        <div className="form-group">
-          <label>Note</label>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-
+        <div className="ae-field">
+          <label className="ae-label">Amount</label>
+          <div className="ae-amount-row">
+            <div className="ae-prefix">RM</div>
             <input
-              name="note"
-              value={form.note}
+              className="ae-amount-input"
+              type="number"
+              name="amount"
+              value={form.amount}
               onChange={handleChange}
-              style={{ flex: 1 }}
+              placeholder="0.00"
+              inputMode="decimal"
+              step="0.01"
             />
-
-            <button
-              className="ai-btn"
-              onClick={handleAICategorize}
-              disabled={aiLoading}
-            >
-              {aiLoading ? '...' : 'AI'}
-            </button>
-
           </div>
         </div>
 
-        {/* CATEGORY */}
-        <div className="form-group">
-          <label>Category</label>
+        {/* NOTE + AI */}
+        <div className="ae-field">
+          <label className="ae-label">Note</label>
+          <div className="ae-note-row">
+            <input
+              className="ae-note-input"
+              type="text"
+              name="note"
+              value={form.note}
+              onChange={handleChange}
+              placeholder="e.g. lunch at mamak"
+            />
+            <button
+              className={`ae-ai-btn${aiLoading ? ' loading' : ''}`}
+              onClick={handleAICategorize}
+              disabled={aiLoading}
+            >
+              {aiLoading ? '…' : '✦ AI'}
+            </button>
+          </div>
+        </div>
 
-          <select
-            name="category"
-            value={form.category}
-            onChange={handleChange}
-          >
+        {/* CATEGORY CHIPS */}
+        <div className="ae-field">
+          <label className="ae-label">Category</label>
+          <div className="ae-chips">
             {CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>
+              <button
+                key={cat}
+                className={`ae-chip${form.category === cat ? ' active' : ''}`}
+                onClick={() => setForm(prev => ({ ...prev, category: cat }))}
+              >
                 {CATEGORY_ICONS[cat]} {cat}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         {/* DATE */}
-        <div className="form-group">
-          <label>Date</label>
-
-          <DatePicker
-            selected={selectedDate}
-            onChange={setSelectedDate}
-            maxDate={new Date()}
-            dateFormat="dd/MM/yyyy"
-          />
+        <div className="ae-field">
+          <label className="ae-label">Date</label>
+          <div className="ae-date-wrap">
+            <span className="ae-date-icon">📅</span>
+            <DatePicker
+              selected={selectedDate}
+              onChange={setSelectedDate}
+              maxDate={new Date()}
+              dateFormat="dd MMMM yyyy"
+              className="ae-datepicker"
+            />
+          </div>
         </div>
 
-        {/* SAVE */}
+        {/* SUBMIT */}
         <button
-          className="btn-primary"
+          className="ae-submit"
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? 'Saving...' : '+ Add Expense'}
+          {loading ? 'Saving…' : '+ Add expense'}
         </button>
 
       </div>
-
     </div>
   )
 }

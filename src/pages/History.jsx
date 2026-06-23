@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
+import { CATEGORIES, COLORS, CATEGORY_ICONS } from '../constants/categories'
 import { useExpenses } from '../hooks/useExpenses'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { exportToExcel } from '../utils/exportExcel'
+import '../styles/history.css'
 
 function History() {
   const { expenses, loading } = useExpenses()
@@ -13,74 +14,32 @@ function History() {
   const [filterCat, setFilterCat] = useState('All')
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
   const [viewReceipt, setViewReceipt] = useState(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
-  // Edit state
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [editDate, setEditDate] = useState(new Date())
   const [saveLoading, setSaveLoading] = useState(false)
 
-  // ── 1. FILTERED DATA DEFINED AT THE TOP ──
   const filtered = expenses
     .filter(e => !filterMonth || e.date?.startsWith(filterMonth))
     .filter(e => filterCat === 'All' || e.category === filterCat)
     .sort((a, b) => b.date?.localeCompare(a.date))
 
-  // ── EXPORT EXCEL HANDLER SCOPE (Reads 'filtered' cleanly now) ──
+  const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount || 0), 0)
+
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    return d.toISOString().slice(0, 7)
+  })
+
+  // ── EXPORT ──
   const handleExportExcel = () => {
     exportToExcel(filtered, `spending-${filterMonth || 'all'}`)
+    setShowExportMenu(false)
   }
 
-  // ── DELETE ──
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this expense?')) return
-    try {
-      await deleteDoc(doc(db, 'expenses', id))
-    } catch (error) {
-      alert('Failed to delete.')
-    }
-  }
-
-  // ── OPEN EDIT ──
-  const handleEditOpen = (e) => {
-    setEditingId(e.id)
-    setEditForm({
-      amount: e.amount,
-      category: e.category,
-      note: e.note || ''
-    })
-    setEditDate(e.date ? new Date(e.date + 'T00:00:00') : new Date())
-  }
-
-  // ── CANCEL EDIT ──
-  const handleEditCancel = () => {
-    setEditingId(null)
-    setEditForm({})
-  }
-
-  // ── SAVE EDIT ──
-  const handleEditSave = async () => {
-    if (!editForm.amount || Number(editForm.amount) <= 0) {
-      alert('Please enter a valid amount.')
-      return
-    }
-    setSaveLoading(true)
-    try {
-      await updateDoc(doc(db, 'expenses', editingId), {
-        amount: parseFloat(editForm.amount),
-        category: editForm.category,
-        note: editForm.note,
-        date: `${editDate.getFullYear()}-${String(editDate.getMonth() + 1).padStart(2, '0')}-${String(editDate.getDate()).padStart(2, '0')}`
-      })
-      setEditingId(null)
-    } catch (error) {
-      console.error(error)
-      alert('Failed to save changes.')
-    }
-    setSaveLoading(false)
-  }
-
-  // ── EXPORT CSV with receipt image ──
   const exportCSV = () => {
     const headers = ['Date', 'Category', 'Amount (RM)', 'Note', 'Receipt Image (URL)']
     const rows = filtered.map(e => [
@@ -95,13 +54,14 @@ function History() {
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
     a.download = `spending-${filterMonth || 'all'}.csv`
     a.click()
+    setShowExportMenu(false)
   }
 
-  // ── EXPORT RECEIPTS as individual images ──
   const exportReceipts = () => {
     const withReceipts = filtered.filter(e => e.receiptImage)
     if (withReceipts.length === 0) {
       alert('No receipts found for this period.')
+      setShowExportMenu(false)
       return
     }
     withReceipts.forEach((e, i) => {
@@ -112,23 +72,88 @@ function History() {
         a.click()
       }, i * 500)
     })
+    setShowExportMenu(false)
   }
 
-  const months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date()
-    d.setMonth(d.getMonth() - i)
-    return d.toISOString().slice(0, 7)
-  })
+  // ── DELETE ──
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this expense?')) return
+    try {
+      await deleteDoc(doc(db, 'expenses', id))
+    } catch {
+      alert('Failed to delete.')
+    }
+  }
 
-  if (loading) return <div className="loading">Loading...</div>
+  // ── EDIT ──
+  const handleEditOpen = (e) => {
+    setEditingId(e.id)
+    setEditForm({ amount: e.amount, category: e.category, note: e.note || '' })
+    setEditDate(e.date ? new Date(e.date + 'T00:00:00') : new Date())
+  }
+
+  const handleEditCancel = () => {
+    setEditingId(null)
+    setEditForm({})
+  }
+
+  const handleEditSave = async () => {
+    if (!editForm.amount || Number(editForm.amount) <= 0) {
+      alert('Please enter a valid amount.')
+      return
+    }
+    setSaveLoading(true)
+    try {
+      await updateDoc(doc(db, 'expenses', editingId), {
+        amount: parseFloat(editForm.amount),
+        category: editForm.category,
+        note: editForm.note,
+        date: `${editDate.getFullYear()}-${String(editDate.getMonth() + 1).padStart(2, '0')}-${String(editDate.getDate()).padStart(2, '0')}`
+      })
+      setEditingId(null)
+    } catch {
+      alert('Failed to save changes.')
+    }
+    setSaveLoading(false)
+  }
+
+  if (loading) return <div className="hy-loading">Loading…</div>
 
   return (
-    <div className="page-container">
-      <h2 className="page-title">📜 History</h2>
+    <div className="hy-root">
+
+      {/* HEADER */}
+      <div className="hy-header">
+        <span className="hy-title">History</span>
+        <div className="hy-header-right">
+          <div className="hy-export-wrap">
+            <button
+              className="hy-export-btn"
+              onClick={() => setShowExportMenu(prev => !prev)}
+            >
+              ↓ Export
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="hy-export-backdrop" onClick={() => setShowExportMenu(false)} />
+                <div className="hy-export-menu">
+                  <button className="hy-export-item" onClick={exportCSV}>📄 CSV</button>
+                  <button className="hy-export-item" onClick={handleExportExcel}>📊 Excel</button>
+                  <button className="hy-export-item" onClick={exportReceipts}>🧾 Receipts</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* FILTERS */}
-      <div className="filter-row">
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+      <div className="hy-filters">
+        <select
+          className="hy-select"
+          value={filterMonth}
+          onChange={e => setFilterMonth(e.target.value)}
+        >
           <option value="">All months</option>
           {months.map(m => (
             <option key={m} value={m}>
@@ -137,84 +162,98 @@ function History() {
           ))}
         </select>
 
-        <select value={filterCat} onChange={e => setFilterCat(e.target.value)}>
-          <option value="All">📂 All</option>
+        <select
+          className="hy-select"
+          value={filterCat}
+          onChange={e => setFilterCat(e.target.value)}
+        >
+          <option value="All">All categories</option>
           {CATEGORIES.map(cat => (
             <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat}</option>
           ))}
         </select>
-
-        <button className="export-btn" onClick={exportCSV}>⬇ CSV</button>
-        <button className="export-btn" onClick={handleExportExcel}>📊 Excel</button>
-        <button className="export-btn" onClick={exportReceipts}>🧾 Receipts</button>
       </div>
 
+      {/* SUMMARY BAR */}
+      {filtered.length > 0 && (
+        <div className="hy-summary">
+          <span className="hy-summary-count">{filtered.length} transactions</span>
+          <span className="hy-summary-total">RM {totalFiltered.toFixed(2)}</span>
+        </div>
+      )}
+
       {/* LIST */}
-      <div className="form-card">
+      <div className="hy-list">
         {filtered.length === 0 ? (
-          <div className="empty">No expenses found.</div>
+          <div className="hy-empty">No expenses found.</div>
         ) : filtered.map(e => (
           <div key={e.id}>
 
             {/* NORMAL VIEW */}
             {editingId !== e.id ? (
-              <div className="expense-item">
-                <div className="expense-main">
+              <div className="hy-item">
+                <div
+                  className="hy-item-icon"
+                  style={{ background: (COLORS[e.category] || '#9ca3af') + '22' }}
+                >
+                  {CATEGORY_ICONS[e.category] || '📦'}
+                </div>
 
-                  <div className="expense-info">
-                    <div className="expense-header-row">
-                      <div className="expense-name">
-                        {CATEGORY_ICONS[e.category]} {e.note || e.category}
-                      </div>
-                    </div>
-                    <div className="expense-meta">
-                      {e.category} · {e.date}
-                    </div>
-                    <div className="expense-amount-bottom">
-                      RM {Number(e.amount || 0).toFixed(2)}
-                    </div>
+                <div className="hy-item-info">
+                  <div className="hy-item-name">{e.note || e.category}</div>
+                  <div className="hy-item-meta">{e.category} · {e.date}</div>
+                  {e.receiptImage && (
+                    <button
+                      className="hy-receipt-link"
+                      onClick={() => setViewReceipt(e.receiptImage)}
+                    >
+                      🧾 View receipt
+                    </button>
+                  )}
+                </div>
 
-                    {/* RECEIPT THUMBNAIL */}
-                    {e.receiptImage && (
-                      <div
-                        className="receipt-thumb-wrap"
-                        onClick={() => setViewReceipt(e.receiptImage)}
-                      >
-                        <img
-                          src={e.receiptImage}
-                          alt="Receipt"
-                          className="receipt-thumb"
-                        />
-                        <span className="receipt-thumb-label">🧾 View Receipt</span>
-                      </div>
-                    )}
+                <div className="hy-item-right">
+                  <div className="hy-item-amt">- RM {Number(e.amount || 0).toFixed(2)}</div>
+                  <div className="hy-item-actions">
+                    <button
+                      className="hy-act-btn"
+                      onClick={() => handleEditOpen(e)}
+                      aria-label="Edit"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="hy-act-btn del"
+                      onClick={() => handleDelete(e.id)}
+                      aria-label="Delete"
+                    >
+                      🗑
+                    </button>
                   </div>
-
-                  <div className="expense-actions">
-                    <button className="edit-btn" onClick={() => handleEditOpen(e)}>✏️</button>
-                    <button className="delete-btn" onClick={() => handleDelete(e.id)}>🗑</button>
-                  </div>
-
                 </div>
               </div>
 
             ) : (
 
               /* EDIT VIEW */
-              <div className="edit-form">
-                <div className="edit-title">✏️ Edit Expense</div>
+              <div className="hy-edit-card">
+                <div className="hy-edit-title">✏️ Edit expense</div>
 
-                <div className="edit-row">
+                <div className="hy-edit-field">
                   <label>Amount (RM)</label>
-                  <input
-                    type="number"
-                    value={editForm.amount}
-                    onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
-                    step="0.01"
-                  />
+                  <div className="hy-edit-amount-row">
+                    <span className="hy-edit-prefix">RM</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      value={editForm.amount}
+                      onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
+                    />
+                  </div>
                 </div>
 
-                <div className="edit-row">
+                <div className="hy-edit-field">
                   <label>Note</label>
                   <input
                     type="text"
@@ -224,53 +263,62 @@ function History() {
                   />
                 </div>
 
-                <div className="edit-row">
+                <div className="hy-edit-field">
                   <label>Category</label>
-                  <select
-                    value={editForm.category}
-                    onChange={e => setEditForm({ ...editForm, category: e.target.value })}
-                  >
+                  <div className="hy-edit-chips">
                     {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat}</option>
+                      <button
+                        key={cat}
+                        className={`hy-edit-chip${editForm.category === cat ? ' active' : ''}`}
+                        onClick={() => setEditForm({ ...editForm, category: cat })}
+                      >
+                        {CATEGORY_ICONS[cat]} {cat}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
-                <div className="edit-row">
+                <div className="hy-edit-field">
                   <label>Date</label>
-                  <DatePicker
-                    selected={editDate}
-                    onChange={setEditDate}
-                    maxDate={new Date()}
-                    dateFormat="dd/MM/yyyy"
-                    className="datepicker-input"
-                  />
+                  <div className="hy-edit-date-wrap">
+                    <span>📅</span>
+                    <DatePicker
+                      selected={editDate}
+                      onChange={setEditDate}
+                      maxDate={new Date()}
+                      dateFormat="dd MMMM yyyy"
+                      className="hy-edit-datepicker"
+                    />
+                  </div>
                 </div>
 
-                <div className="edit-actions">
-                  <button className="btn-cancel" onClick={handleEditCancel}>Cancel</button>
-                  <button className="btn-save" onClick={handleEditSave} disabled={saveLoading}>
-                    {saveLoading ? 'Saving...' : '✅ Save'}
+                <div className="hy-edit-actions">
+                  <button className="hy-cancel-btn" onClick={handleEditCancel}>Cancel</button>
+                  <button
+                    className="hy-save-btn"
+                    onClick={handleEditSave}
+                    disabled={saveLoading}
+                  >
+                    {saveLoading ? 'Saving…' : '✅ Save'}
                   </button>
                 </div>
               </div>
             )}
-
           </div>
         ))}
       </div>
 
       {/* RECEIPT MODAL */}
       {viewReceipt && (
-        <div className="receipt-modal-overlay" onClick={() => setViewReceipt(null)}>
-          <div className="receipt-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="receipt-modal-header">
+        <div className="hy-modal-overlay" onClick={() => setViewReceipt(null)}>
+          <div className="hy-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="hy-modal-header">
               <span>🧾 Receipt</span>
-              <button className="receipt-modal-close" onClick={() => setViewReceipt(null)}>✕</button>
+              <button className="hy-modal-close" onClick={() => setViewReceipt(null)}>✕</button>
             </div>
-            <img src={viewReceipt} alt="Receipt" className="receipt-modal-img" />
-            <a href={viewReceipt} download="receipt.jpg" className="receipt-download-btn">
-              ⬇ Download Receipt
+            <img src={viewReceipt} alt="Receipt" className="hy-modal-img" />
+            <a href={viewReceipt} download="receipt.jpg" className="hy-modal-download">
+              ↓ Download receipt
             </a>
           </div>
         </div>

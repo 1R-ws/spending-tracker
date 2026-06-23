@@ -10,18 +10,19 @@ import History from './pages/History'
 import Budget from './pages/Budget'
 import Login from './pages/Login'
 
+import './styles/global.css'
+
 function App() {
   const [user, loading] = useAuthState(auth)
 
-  if (loading) return <div className="loading">Loading...</div>
+  if (loading) return <div className="app-loading">Loading…</div>
 
   return (
     <Router>
       {user ? (
         <>
           <Navbar />
-
-          <div className="container">
+          <main className="app-main">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/add" element={<AddExpense />} />
@@ -29,7 +30,7 @@ function App() {
               <Route path="/budget" element={<Budget />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-          </div>
+          </main>
         </>
       ) : (
         <Routes>
