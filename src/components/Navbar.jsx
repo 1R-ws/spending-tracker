@@ -1,43 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
+import { useTheme } from '../context/ThemeContext'
 import '../styles/navbar.css'
-
-function getInitialDarkMode() {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'dark') return true
-  if (saved === 'light') return false
-  
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  localStorage.setItem('theme', prefersDark ? 'dark' : 'light')
-  return prefersDark
-}
 
 function Navbar() {
   const navigate = useNavigate()
-  const [darkMode, setDarkMode] = useState(getInitialDarkMode)
+  const { darkMode, toggleDarkMode } = useTheme()
   const [showLogoutModal, setShowLogoutModal] = useState(false)
-
-  // Apply dark class whenever darkMode changes
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }, [darkMode])
-
-  // Restore saved theme on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('theme')
-    if (saved === 'dark') {
-      setDarkMode(true)
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
 
   const handleLogoutConfirm = async () => {
     await signOut(auth)
@@ -61,7 +32,7 @@ function Navbar() {
         <div className="nb-topbar-right">
           <button
             className="nb-icon-btn"
-            onClick={() => setDarkMode(prev => !prev)}
+            onClick={toggleDarkMode}
             aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {darkMode ? '☀️' : '🌙'}
