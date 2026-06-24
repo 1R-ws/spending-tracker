@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'  // ← add useRef
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import {
@@ -15,6 +15,7 @@ import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
 import { getSmartCategory } from '../utils/smartCategory'
 import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
+import { uploadReceiptImage } from '../utils/cloudinary'  // ← add import
 import '../styles/addexpense.css'
 
 function AddExpense() {
@@ -25,6 +26,7 @@ function AddExpense() {
   const [scanLoading, setScanLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [receiptPreview, setReceiptPreview] = useState(null)
+  const receiptImageRef = useRef('')  // ← add ref
 
   const [form, setForm] = useState({
     amount: '',
@@ -66,7 +68,12 @@ function AddExpense() {
     setScanLoading(true)
 
     try {
-      const result = await scanReceipt(file)
+      const [result, imageUrl] = await Promise.all([  // ← upload in parallel
+        scanReceipt(file),
+        uploadReceiptImage(file)
+      ])
+      receiptImageRef.current = imageUrl || ''  // ← store URL
+
       if (!result) {
         alert('No data detected.')
         setScanLoading(false)
@@ -91,6 +98,7 @@ function AddExpense() {
 
   const handleRemoveReceipt = () => {
     setReceiptPreview(null)
+    receiptImageRef.current = ''  // ← clear URL
   }
 
   const handleSubmit = async () => {
@@ -106,6 +114,7 @@ function AddExpense() {
         category: form.category,
         note: form.note,
         date: selectedDate.toISOString().slice(0, 10),
+        receiptImage: receiptImageRef.current || '',  // ← save to Firestore
         uid,
         createdAt: serverTimestamp()
       })
