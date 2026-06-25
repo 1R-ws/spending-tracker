@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import { useTheme } from '../context/ThemeContext'
+import { Home, PieChart, Plus, History, LogOut, Sun, Moon } from 'lucide-react'
 import '../styles/navbar.css'
 
 function Navbar() {
@@ -26,7 +27,7 @@ function Navbar() {
       <header className="nb-topbar">
         <div className="nb-brand">
           <span className="nb-brand-icon">💰</span>
-          <span className="nb-brand-name">ExpenseApp</span>
+          <span className="nb-brand-name">Spendly</span>
         </div>
 
         <div className="nb-topbar-right">
@@ -35,7 +36,7 @@ function Navbar() {
             onClick={toggleDarkMode}
             aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {darkMode ? '☀️' : '🌙'}
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
           <div className="nb-avatar" title={user?.email}>
@@ -51,7 +52,7 @@ function Navbar() {
           end
           className={({ isActive }) => `nb-nav-item${isActive ? ' active' : ''}`}
         >
-          <span className="nb-nav-icon">🏠</span>
+          <Home size={22} className="nb-nav-icon" />
           <span className="nb-nav-label">Home</span>
         </NavLink>
 
@@ -59,19 +60,19 @@ function Navbar() {
           to="/budget"
           className={({ isActive }) => `nb-nav-item${isActive ? ' active' : ''}`}
         >
-          <span className="nb-nav-icon">📊</span>
+          <PieChart size={22} className="nb-nav-icon" />
           <span className="nb-nav-label">Budget</span>
         </NavLink>
 
         <NavLink to="/add" className="nb-fab" aria-label="Add expense">
-          <span className="nb-fab-icon">+</span>
+          <Plus size={28} color="#ffffff" />
         </NavLink>
 
         <NavLink
           to="/history"
           className={({ isActive }) => `nb-nav-item${isActive ? ' active' : ''}`}
         >
-          <span className="nb-nav-icon">📜</span>
+          <History size={22} className="nb-nav-icon" />
           <span className="nb-nav-label">History</span>
         </NavLink>
 
@@ -79,7 +80,7 @@ function Navbar() {
           className="nb-nav-item"
           onClick={() => setShowLogoutModal(true)}
         >
-          <span className="nb-nav-icon">🚪</span>
+          <LogOut size={22} className="nb-nav-icon" />
           <span className="nb-nav-label">Logout</span>
         </button>
       </nav>
@@ -88,22 +89,16 @@ function Navbar() {
       {showLogoutModal && (
         <div className="nb-modal-overlay" onClick={() => setShowLogoutModal(false)}>
           <div className="nb-modal" onClick={e => e.stopPropagation()}>
-            <div className="nb-modal-icon">🚪</div>
+            <div className="nb-modal-icon"><LogOut size={36} /></div>
             <div className="nb-modal-title">Log out?</div>
             <div className="nb-modal-body">
               You'll need to sign in again to access your expenses.
             </div>
             <div className="nb-modal-actions">
-              <button
-                className="nb-modal-cancel"
-                onClick={() => setShowLogoutModal(false)}
-              >
+              <button className="nb-modal-cancel" onClick={() => setShowLogoutModal(false)}>
                 Cancel
               </button>
-              <button
-                className="nb-modal-confirm"
-                onClick={handleLogoutConfirm}
-              >
+              <button className="nb-modal-confirm" onClick={handleLogoutConfirm}>
                 Log out
               </button>
             </div>
