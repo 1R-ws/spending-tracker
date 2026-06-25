@@ -57,6 +57,8 @@ function History() {
     setShowExportMenu(false)
   }
 
+  const [showReceiptGallery, setShowReceiptGallery] = useState(false)
+
   const exportReceipts = () => {
     const withReceipts = filtered.filter(e => e.receiptImage)
     if (withReceipts.length === 0) {
@@ -64,26 +66,19 @@ function History() {
       setShowExportMenu(false)
       return
     }
-    withReceipts.forEach((e, i) => {
-      setTimeout(() => {
-        const a = document.createElement('a')
-        a.href = e.receiptImage
-        a.download = `receipt-${e.date}-${e.category}-RM${e.amount}.jpg`
-        a.click()
-      }, i * 500)
-    })
+    setShowReceiptGallery(true)
     setShowExportMenu(false)
   }
 
-  // ── DELETE ──
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this expense?')) return
-    try {
-      await deleteDoc(doc(db, 'expenses', id))
-    } catch {
-      alert('Failed to delete.')
+    // ── DELETE ──
+    const handleDelete = async (id) => {
+      if (!window.confirm('Delete this expense?')) return
+      try {
+        await deleteDoc(doc(db, 'expenses', id))
+      } catch {
+        alert('Failed to delete.')
+      }
     }
-  }
 
   // ── EDIT ──
   const handleEditOpen = (e) => {
@@ -324,6 +319,30 @@ function History() {
         </div>
       )}
 
+  {/* RECEIPT GALLERY */}
+  {showReceiptGallery && (
+    <div className="hy-modal-overlay" onClick={() => setShowReceiptGallery(false)}>
+      <div className="hy-modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', width: '92vw', maxWidth: 480 }}>
+        <div className="hy-modal-header">
+          <span>🧾 All Receipts ({filtered.filter(e => e.receiptImage).length})</span>
+          <button className="hy-modal-close" onClick={() => setShowReceiptGallery(false)}>✕</button>
+        </div>
+        {filtered.filter(e => e.receiptImage).map(e => (
+          <div key={e.id} style={{ marginBottom: 16, borderBottom: '1px solid #eee', paddingBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>
+              {e.date} · {e.category} · RM {Number(e.amount).toFixed(2)}
+            </div>
+            <img
+              src={e.receiptImage}
+              alt="Receipt"
+              style={{ width: '100%', borderRadius: 8, cursor: 'pointer' }}
+              onClick={() => { setViewReceipt(e.receiptImage); setShowReceiptGallery(false) }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
     </div>
   )
 }
