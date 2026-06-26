@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import { useTheme } from '../context/ThemeContext'
-import { Home, PieChart, Plus, History, LogOut, Sun, Moon } from 'lucide-react'
+import { Home, PieChart, Plus, History, LogOut, Sun, Moon, Wallet } from 'lucide-react'
 import '../styles/navbar.css'
 
 function Navbar() {
@@ -26,7 +26,7 @@ function Navbar() {
       {/* TOP BAR */}
       <header className="nb-topbar">
         <div className="nb-brand">
-          <span className="nb-brand-icon">💰</span>
+          <Wallet size={20} className="nb-brand-icon" />
           <span className="nb-brand-name">Spendly</span>
         </div>
 

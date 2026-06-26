@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'  // ← add useRef
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import { Camera, CalendarDays } from 'lucide-react'
 import {
   collection,
   addDoc,
@@ -159,7 +160,9 @@ function AddExpense() {
               onChange={handleReceiptScan}
               style={{ display: 'none' }}
             />
-            <span className="ae-scan-icon">📷</span>
+            <span className="ae-scan-icon">
+              <Camera size={30}/>
+            </span>
             <span className="ae-scan-label">
               {scanLoading ? 'Scanning receipt…' : 'Scan receipt'}
             </span>
