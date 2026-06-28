@@ -21,6 +21,7 @@ function History() {
   const [swipedId, setSwipedId] = useState(null)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
+  const longPressTimer = useRef(null)
   const [showSwipeHint, setShowSwipeHint] = useState(() => !localStorage.getItem('swipeHintSeen'))
 
   const [editingId, setEditingId] = useState(null)
@@ -220,8 +221,13 @@ function History() {
             onTouchStart={ev => {
               touchStartX.current = ev.touches[0].clientX
               touchStartY.current = ev.touches[0].clientY
+              longPressTimer.current = setTimeout(() => {
+                setShowSwipeHint(true)
+              }, 600)
             }}
+            onTouchMove={() => clearTimeout(longPressTimer.current)}
             onTouchEnd={ev => {
+              clearTimeout(longPressTimer.current)
               const dx = touchStartX.current - ev.changedTouches[0].clientX
               const dy = Math.abs(touchStartY.current - ev.changedTouches[0].clientY)
               if (dy > 30) return // vertical scroll, ignore
