@@ -629,6 +629,33 @@
   font-size: 14px;
 }
 
+/* SWIPE HINT — touch devices only */
+.hy-swipe-hint {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  background: var(--hy-purple-50);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--hy-purple-text);
+  font-weight: 500;
+}
+.hy-swipe-hint-close {
+  background: none;
+  border: none;
+  color: var(--hy-purple-text);
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: none) and (pointer: coarse) {
+  .hy-swipe-hint { display: flex; }
+}
+
 /* Desktop shows buttons, mobile hides them (swipe instead) */
 .desktop-only { display: flex; }
 @media (hover: none) and (pointer: coarse) {

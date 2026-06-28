@@ -21,6 +21,7 @@ function History() {
   const [swipedId, setSwipedId] = useState(null)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
+  const [showSwipeHint, setShowSwipeHint] = useState(() => !localStorage.getItem('swipeHintSeen'))
 
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
@@ -200,6 +201,14 @@ function History() {
         </div>
       )}
 
+      {/* SWIPE HINT */}
+      {showSwipeHint && filtered.length > 0 && (
+        <div className="hy-swipe-hint">
+          <span>👈 Swipe left on an item to edit or delete</span>
+          <button className="hy-swipe-hint-close" onClick={() => { setShowSwipeHint(false); localStorage.setItem('swipeHintSeen', '1') }}>✕</button>
+        </div>
+      )}
+
       {/* LIST */}
       <div className="hy-list" onClick={() => setSwipedId(null)}>
         {filtered.length === 0 ? (
@@ -216,8 +225,13 @@ function History() {
               const dx = touchStartX.current - ev.changedTouches[0].clientX
               const dy = Math.abs(touchStartY.current - ev.changedTouches[0].clientY)
               if (dy > 30) return // vertical scroll, ignore
-              if (dx > 50) setSwipedId(e.id)
-              else if (dx < -20) setSwipedId(null)
+              if (dx > 50) {
+                setSwipedId(e.id)
+                if (showSwipeHint) {
+                  setShowSwipeHint(false)
+                  localStorage.setItem('swipeHintSeen', '1')
+                }
+              } else if (dx < -20) setSwipedId(null)
             }}
           >
             {/* SWIPE ACTION BUTTONS (behind the item) */}
