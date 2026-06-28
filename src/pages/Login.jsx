@@ -1,5 +1,6 @@
 import { signInWithPopup } from 'firebase/auth'
 import { auth, provider } from '../firebase/config'
+import { Wallet, ScanLine, PieChart, Target } from 'lucide-react'
 
 function Login() {
   const handleLogin = async () => {
@@ -14,22 +15,24 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-icon">💰</div>
+        <div className="login-icon">
+          <Wallet size={30} strokeWidth={1.8} color="#7F77DD" />
+        </div>
 
-        <h1>ExpenseApp</h1>
+        <h1>Spendly</h1>
         <p className="login-sub">Track your spending, the smart way</p>
 
         <div className="login-features">
           <div className="login-feature">
-            <span className="login-feature-icon">📷</span>
+            <span className="login-feature-icon"><ScanLine size={18} strokeWidth={1.8} color="#7F77DD" /></span>
             <span>Scan receipts instantly</span>
           </div>
           <div className="login-feature">
-            <span className="login-feature-icon">📊</span>
+            <span className="login-feature-icon"><PieChart size={18} strokeWidth={1.8} color="#7F77DD" /></span>
             <span>See where your money goes</span>
           </div>
           <div className="login-feature">
-            <span className="login-feature-icon">🎯</span>
+            <span className="login-feature-icon"><Target size={18} strokeWidth={1.8} color="#7F77DD" /></span>
             <span>Set budgets that stick</span>
           </div>
         </div>

@@ -44,13 +44,18 @@ function Budget() {
   }
 
   const handleSave = async (cat) => {
+    if (!auth.currentUser) {
+      alert('Session expired. Please sign in again.')
+      return
+    }
+    const uid = auth.currentUser.uid
     const raw = inputs[cat]
     if (raw === '' || raw === null || raw === undefined) {
       const updated = { ...budgets }
       delete updated[cat]
       setBudgets(updated)
       setEditMode(prev => ({ ...prev, [cat]: false }))
-      await setDoc(doc(db, 'budgets', auth.currentUser.uid), updated)
+      await setDoc(doc(db, 'budgets', uid), updated)
       return
     }
     const val = Number(raw)
@@ -58,7 +63,7 @@ function Budget() {
     const updated = { ...budgets, [cat]: val }
     setBudgets(updated)
     setEditMode(prev => ({ ...prev, [cat]: false }))
-    await setDoc(doc(db, 'budgets', auth.currentUser.uid), updated)
+    await setDoc(doc(db, 'budgets', uid), updated)
   }
 
   const handleCancel = (cat) => {

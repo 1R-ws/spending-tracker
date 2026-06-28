@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs'
 
 export async function exportToExcel(expenses, filename = 'spending') {
+  let imageEmbedFailures = 0
 
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Expenses')
@@ -65,6 +66,7 @@ export async function exportToExcel(expenses, filename = 'spending') {
       } catch (err) {
         console.error('Image fetch error:', err)
         sheet.getRow(rowIndex).getCell('receipt').value = e.receiptImage
+        imageEmbedFailures++
       }
     }
 
@@ -78,6 +80,10 @@ export async function exportToExcel(expenses, filename = 'spending') {
         }
       })
     }
+  }
+
+  if (imageEmbedFailures > 0) {
+    alert(`${imageEmbedFailures} receipt image(s) could not be embedded and were saved as links instead.`)
   }
 
   // Download file

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { CATEGORIES, COLORS, CATEGORY_ICONS } from '../constants/categories'
@@ -13,17 +13,25 @@ function History() {
 
   const [filterCat, setFilterCat] = useState('All')
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [search, setSearch] = useState('')
   const [viewReceipt, setViewReceipt] = useState(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+
+  const [deleteId, setDeleteId] = useState(null)
+  const [swipedId, setSwipedId] = useState(null)
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
 
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [editDate, setEditDate] = useState(new Date())
   const [saveLoading, setSaveLoading] = useState(false)
 
+  const searchLower = search.toLowerCase().trim()
   const filtered = expenses
     .filter(e => !filterMonth || e.date?.startsWith(filterMonth))
     .filter(e => filterCat === 'All' || e.category === filterCat)
+    .filter(e => !searchLower || (e.note || '').toLowerCase().includes(searchLower) || e.category.toLowerCase().includes(searchLower))
     .sort((a, b) => b.date?.localeCompare(a.date))
 
   const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount || 0), 0)
@@ -71,14 +79,14 @@ function History() {
   }
 
     // ── DELETE ──
-    const handleDelete = async (id) => {
-      if (!window.confirm('Delete this expense?')) return
-      try {
-        await deleteDoc(doc(db, 'expenses', id))
-      } catch {
-        alert('Failed to delete.')
-      }
+  const handleDelete = async () => {
+    try {
+      await deleteDoc(doc(db, 'expenses', deleteId))
+    } catch {
+      alert('Failed to delete.')
     }
+    setDeleteId(null)
+  }
 
   // ── EDIT ──
   const handleEditOpen = (e) => {
@@ -142,6 +150,21 @@ function History() {
         </div>
       </div>
 
+      {/* SEARCH */}
+      <div className="hy-search-wrap">
+        <span className="hy-search-icon">🔍</span>
+        <input
+          className="hy-search-input"
+          type="text"
+          placeholder="Search notes or category…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button className="hy-search-clear" onClick={() => setSearch('')}>✕</button>
+        )}
+      </div>
+
       {/* FILTERS */}
       <div className="hy-filters">
         <select
@@ -178,130 +201,140 @@ function History() {
       )}
 
       {/* LIST */}
-      <div className="hy-list">
+      <div className="hy-list" onClick={() => setSwipedId(null)}>
         {filtered.length === 0 ? (
           <div className="hy-empty">No expenses found.</div>
         ) : filtered.map(e => (
-          <div key={e.id}>
+          <div
+            key={e.id}
+            className="hy-swipe-wrap"
+            onTouchStart={ev => {
+              touchStartX.current = ev.touches[0].clientX
+              touchStartY.current = ev.touches[0].clientY
+            }}
+            onTouchEnd={ev => {
+              const dx = touchStartX.current - ev.changedTouches[0].clientX
+              const dy = Math.abs(touchStartY.current - ev.changedTouches[0].clientY)
+              if (dy > 30) return // vertical scroll, ignore
+              if (dx > 50) setSwipedId(e.id)
+              else if (dx < -20) setSwipedId(null)
+            }}
+          >
+            {/* SWIPE ACTION BUTTONS (behind the item) */}
+            <div className="hy-swipe-actions">
+              <button className="hy-swipe-edit" onClick={() => { setSwipedId(null); handleEditOpen(e) }}>✏️ Edit</button>
+              <button className="hy-swipe-delete" onClick={() => { setSwipedId(null); setDeleteId(e.id) }}>🗑 Delete</button>
+            </div>
 
-            {/* NORMAL VIEW */}
-            {editingId !== e.id ? (
-              <div className="hy-item">
-                <div
-                  className="hy-item-icon"
-                  style={{ background: (COLORS[e.category] || '#9ca3af') + '22' }}
-                >
-                  {CATEGORY_ICONS[e.category] || '📦'}
-                </div>
-
-                <div className="hy-item-info">
-                  <div className="hy-item-name">{e.note || e.category}</div>
-                  <div className="hy-item-meta">{e.category} · {e.date}</div>
-                  {e.receiptImage && (
-                    <button
-                      className="hy-receipt-link"
-                      onClick={() => setViewReceipt(e.receiptImage)}
-                    >
-                      🧾 View receipt
-                    </button>
-                  )}
-                </div>
-
-                <div className="hy-item-right">
-                  <div className="hy-item-amt">- RM {Number(e.amount || 0).toFixed(2)}</div>
-                  <div className="hy-item-actions">
-                    <button
-                      className="hy-act-btn"
-                      onClick={() => handleEditOpen(e)}
-                      aria-label="Edit"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="hy-act-btn del"
-                      onClick={() => handleDelete(e.id)}
-                      aria-label="Delete"
-                    >
-                      🗑
-                    </button>
-                  </div>
-                </div>
+            {/* ITEM ROW */}
+            <div
+              className={`hy-item${swipedId === e.id ? ' swiped' : ''}`}
+              onClick={() => swipedId === e.id && setSwipedId(null)}
+            >
+              <div
+                className="hy-item-icon"
+                style={{ background: (COLORS[e.category] || '#9ca3af') + '22' }}
+              >
+                {CATEGORY_ICONS[e.category] || '📦'}
               </div>
 
-            ) : (
-
-              /* EDIT VIEW */
-              <div className="hy-edit-card">
-                <div className="hy-edit-title">✏️ Edit expense</div>
-
-                <div className="hy-edit-field">
-                  <label>Amount (RM)</label>
-                  <div className="hy-edit-amount-row">
-                    <span className="hy-edit-prefix">RM</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      value={editForm.amount}
-                      onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="hy-edit-field">
-                  <label>Note</label>
-                  <input
-                    type="text"
-                    value={editForm.note}
-                    onChange={e => setEditForm({ ...editForm, note: e.target.value })}
-                    placeholder="e.g. lunch at mamak"
-                  />
-                </div>
-
-                <div className="hy-edit-field">
-                  <label>Category</label>
-                  <div className="hy-edit-chips">
-                    {CATEGORIES.map(cat => (
-                      <button
-                        key={cat}
-                        className={`hy-edit-chip${editForm.category === cat ? ' active' : ''}`}
-                        onClick={() => setEditForm({ ...editForm, category: cat })}
-                      >
-                        {CATEGORY_ICONS[cat]} {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="hy-edit-field">
-                  <label>Date</label>
-                  <div className="hy-edit-date-wrap">
-                    <span>📅</span>
-                    <DatePicker
-                      selected={editDate}
-                      onChange={setEditDate}
-                      maxDate={new Date()}
-                      dateFormat="dd MMMM yyyy"
-                      className="hy-edit-datepicker"
-                    />
-                  </div>
-                </div>
-
-                <div className="hy-edit-actions">
-                  <button className="hy-cancel-btn" onClick={handleEditCancel}>Cancel</button>
+              <div className="hy-item-info">
+                <div className="hy-item-name">{e.note || e.category}</div>
+                <div className="hy-item-meta">{e.category} · {e.date ? new Date(e.date + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</div>
+                {e.receiptImage && (
                   <button
-                    className="hy-save-btn"
-                    onClick={handleEditSave}
-                    disabled={saveLoading}
+                    className="hy-receipt-link"
+                    onClick={() => setViewReceipt(e.receiptImage)}
                   >
-                    {saveLoading ? 'Saving…' : '✅ Save'}
+                    🧾 View receipt
                   </button>
+                )}
+              </div>
+
+              <div className="hy-item-right">
+                <div className="hy-item-amt">- RM {Number(e.amount || 0).toFixed(2)}</div>
+                <div className="hy-item-actions desktop-only">
+                  <button className="hy-act-btn" onClick={() => handleEditOpen(e)} aria-label="Edit">✏️</button>
+                  <button className="hy-act-btn del" onClick={() => setDeleteId(e.id)} aria-label="Delete">🗑</button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>
+
+
+      {/* EDIT BOTTOM SHEET */}
+      {editingId && (
+        <div className="hy-modal-overlay" onClick={handleEditCancel}>
+          <div className="hy-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="hy-modal-header">
+              <span>✏️ Edit expense</span>
+              <button className="hy-modal-close" onClick={handleEditCancel}>✕</button>
+            </div>
+
+            <div className="hy-edit-field">
+              <label>Amount (RM)</label>
+              <div className="hy-edit-amount-row">
+                <span className="hy-edit-prefix">RM</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  value={editForm.amount}
+                  onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="hy-edit-field">
+              <label>Note</label>
+              <input
+                type="text"
+                value={editForm.note}
+                onChange={e => setEditForm({ ...editForm, note: e.target.value })}
+                placeholder="e.g. lunch at mamak"
+              />
+            </div>
+
+            <div className="hy-edit-field">
+              <label>Category</label>
+              <div className="hy-edit-chips">
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat}
+                    className={`hy-edit-chip${editForm.category === cat ? ' active' : ''}`}
+                    onClick={() => setEditForm({ ...editForm, category: cat })}
+                  >
+                    {CATEGORY_ICONS[cat]} {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="hy-edit-field">
+              <label>Date</label>
+              <div className="hy-edit-date-wrap">
+                <span>📅</span>
+                <DatePicker
+                  selected={editDate}
+                  onChange={setEditDate}
+                  maxDate={new Date()}
+                  dateFormat="dd MMMM yyyy"
+                  className="hy-edit-datepicker"
+                />
+              </div>
+            </div>
+
+            <div className="hy-edit-actions">
+              <button className="hy-cancel-btn" onClick={handleEditCancel}>Cancel</button>
+              <button className="hy-save-btn" onClick={handleEditSave} disabled={saveLoading}>
+                {saveLoading ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* RECEIPT MODAL */}
       {viewReceipt && (
@@ -312,12 +345,27 @@ function History() {
               <button className="hy-modal-close" onClick={() => setViewReceipt(null)}>✕</button>
             </div>
             <img src={viewReceipt} alt="Receipt" className="hy-modal-img" />
-            <a href={viewReceipt} download="receipt.jpg" className="hy-modal-download">
+            <a href={viewReceipt} download={`receipt.${viewReceipt.split('.').pop().split('?')[0] || 'jpg'}`} className="hy-modal-download">
               ↓ Download receipt
             </a>
           </div>
         </div>
       )}
+
+  {/* DELETE CONFIRM MODAL */}
+  {deleteId && (
+    <div className="hy-modal-overlay" onClick={() => setDeleteId(null)}>
+      <div className="hy-delete-modal" onClick={e => e.stopPropagation()}>
+        <div className="hy-delete-icon">🗑️</div>
+        <div className="hy-delete-title">Delete expense?</div>
+        <div className="hy-delete-sub">This can't be undone.</div>
+        <div className="hy-delete-actions">
+          <button className="hy-cancel-btn" onClick={() => setDeleteId(null)}>Cancel</button>
+          <button className="hy-delete-confirm-btn" onClick={handleDelete}>Delete</button>
+        </div>
+      </div>
+    </div>
+  )}
 
   {/* RECEIPT GALLERY */}
   {showReceiptGallery && (

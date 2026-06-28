@@ -6,7 +6,8 @@ import {
   onSnapshot
 } from 'firebase/firestore'
 import { db, auth } from '../firebase/config'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { onAuthStateChanged } from 'firebase/auth'
+import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { CATEGORIES, COLORS, CATEGORY_ICONS } from '../constants/categories'
 import '../styles/dashboard.css'
@@ -20,15 +21,19 @@ function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!auth.currentUser) return
-    const q = query(
-      collection(db, 'expenses'),
-      where('uid', '==', auth.currentUser.uid)
-    )
-    const unsub = onSnapshot(q, (snapshot) => {
-      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+    let unsubSnapshot = null
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubSnapshot) unsubSnapshot()
+      if (!user) { setExpenses([]); return }
+      const q = query(
+        collection(db, 'expenses'),
+        where('uid', '==', user.uid)
+      )
+      unsubSnapshot = onSnapshot(q, (snapshot) => {
+        setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+      })
     })
-    return () => unsub()
+    return () => { unsubAuth(); if (unsubSnapshot) unsubSnapshot() }
   }, [])
 
   const year = new Date().getFullYear()
@@ -55,6 +60,19 @@ function Dashboard() {
     .slice(0, 5)
 
   const filteredTotal = filteredExp.reduce((s, e) => s + Number(e.amount || 0), 0)
+
+  const [trendMonths, setTrendMonths] = useState(6)
+
+  const trendData = Array.from({ length: trendMonths }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (trendMonths - 1 - i))
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const total = expenses
+      .filter(e => e.date?.startsWith(key))
+      .filter(e => !selectedCategory || e.category === selectedCategory)
+      .reduce((s, e) => s + Number(e.amount || 0), 0)
+    return { month: MONTHS[d.getMonth()], total: parseFloat(total.toFixed(2)) }
+  })
 
   const handleCatClick = (catName) => {
     setSelectedCategory(prev => prev === catName ? null : catName)
@@ -136,6 +154,51 @@ function Dashboard() {
         ))}
       </div>
 
+      {/* TREND CHART */}
+      <div className="trend-section">
+        <div className="trend-header">
+          <span className="trend-title">{selectedCategory ? `${selectedCategory} Trend` : 'Spending Trend'}</span>
+          <div className="trend-range">
+            {[3, 6, 12].map(n => (
+              <button
+                key={n}
+                className={`trend-range-btn${trendMonths === n ? ' active' : ''}`}
+                onClick={() => setTrendMonths(n)}
+              >
+                {n}M
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="trend-chart-wrap">
+          {(() => {
+            const color = selectedCategory ? (COLORS[selectedCategory] || '#534AB7') : '#534AB7'
+            return (
+              <ResponsiveContainer width="100%" height={160}>
+                <AreaChart data={trendData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--dash-muted)' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--dash-muted)' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={(v) => [`RM ${v.toFixed(2)}`, selectedCategory || 'Total']}
+                    contentStyle={{ background: 'var(--dash-card)', border: '1px solid var(--dash-border)', borderRadius: 12, fontSize: 13 }}
+                    labelStyle={{ color: 'var(--dash-text)', fontWeight: 700 }}
+                    itemStyle={{ color }}
+                  />
+                  <Area type="monotone" dataKey="total" stroke={color} strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3, fill: color, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )
+          })()}
+        </div>
+      </div>
+
       {/* RECENT TRANSACTIONS */}
       <div className="recent-section">
         <div className="recent-header">
@@ -159,7 +222,7 @@ function Dashboard() {
             </div>
             <div className="tx-info">
               <div className="tx-name">{e.note || e.category}</div>
-              <div className="tx-meta">{e.category} · {e.date}</div>
+              <div className="tx-meta">{e.category} · {e.date ? new Date(e.date + 'T00:00:00').toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</div>
             </div>
             <div className="tx-amount">- RM {Number(e.amount || 0).toFixed(2)}</div>
           </div>

@@ -14,7 +14,7 @@ import { db, auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { categorizeExpense } from '../utils/gemini'
 import { scanReceipt } from '../utils/receiptScanner'
-import { getSmartCategory } from '../utils/smartCategory'
+import { getSmartCategory, normalizeNote, getKeys } from '../utils/smartCategory'
 import { CATEGORIES, CATEGORY_ICONS } from '../constants/categories'
 import { uploadReceiptImage } from '../utils/cloudinary'  // ← add import
 import '../styles/addexpense.css'
@@ -69,11 +69,12 @@ function AddExpense() {
     setScanLoading(true)
 
     try {
-      const [result, imageUrl] = await Promise.all([  // ← upload in parallel
+      const [result, imageUrl] = await Promise.all([
         scanReceipt(file),
         uploadReceiptImage(file)
       ])
-      receiptImageRef.current = imageUrl || ''  // ← store URL
+      receiptImageRef.current = imageUrl || ''
+      if (!imageUrl) alert('Receipt image could not be uploaded. Scan results were still applied.')
 
       if (!result) {
         alert('No data detected.')
@@ -110,6 +111,11 @@ function AddExpense() {
     setLoading(true)
     try {
       const uid = auth.currentUser?.uid
+      if (!uid) {
+        alert('Session expired. Please sign in again.')
+        setLoading(false)
+        return
+      }
       await addDoc(collection(db, 'expenses'), {
         amount: parseFloat(form.amount),
         category: form.category,
@@ -120,11 +126,7 @@ function AddExpense() {
         createdAt: serverTimestamp()
       })
 
-      const keyword = (form.note || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9 ]/g, '')
-        .trim()
-        .split(' ')[0]
+      const keyword = normalizeNote(form.note || '')
 
       if (keyword && uid) {
         const categoryUpdate = {
@@ -133,8 +135,11 @@ function AddExpense() {
             lastUsed: serverTimestamp()
           }
         }
-        await setDoc(doc(db, 'userPatterns', `${uid}_${keyword}`), categoryUpdate, { merge: true })
-        await setDoc(doc(db, 'globalPatterns', keyword), categoryUpdate, { merge: true })
+        const keys = getKeys(keyword)
+        await Promise.all(keys.flatMap(k => [
+          setDoc(doc(db, 'userPatterns', `${uid}_${k}`), categoryUpdate, { merge: true }),
+          setDoc(doc(db, 'globalPatterns', k), categoryUpdate, { merge: true }),
+        ]))
       }
 
       navigate('/')

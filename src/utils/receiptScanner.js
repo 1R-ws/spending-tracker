@@ -309,7 +309,7 @@ export async function scanReceipt(file) {
       lowerNote.includes('grab') || lowerNote.includes('myrapid') ||
       lowerNote.includes('lrt') || lowerNote.includes('mrt') ||
       lowerNote.includes('bus') || lowerNote.includes('taxi')
-    ) category = 'Transport';
+    ) category = 'Travel';
 
     // ========================
     // FINAL RESULT

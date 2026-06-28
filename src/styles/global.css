@@ -45,8 +45,8 @@ html.dark body {
 
 /* Sits below sticky topbar, above fixed bottom nav */
 .app-main {
-  /* topbar height — update if you change nb-topbar height */
   min-height: 100vh;
+  padding-top: 56px;
 }
 
 /* Support iPhone notch / home bar */
