@@ -11,8 +11,18 @@ function Budget() {
   const [inputs, setInputs] = useState({})
   const [editMode, setEditMode] = useState({})
 
-  const thisMonth = new Date().toISOString().slice(0, 7)
-  const monthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
+
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  const thisMonth = selectedMonth
+  const monthName = new Date(selectedMonth + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })
 
   useEffect(() => {
     const load = async () => {
@@ -81,7 +91,17 @@ function Budget() {
       {/* HEADER */}
       <div className="bg-header">
         <span className="bg-title">Budget</span>
-        <span className="bg-month">{monthName}</span>
+        <select
+          className="bg-month-select"
+          value={selectedMonth}
+          onChange={e => setSelectedMonth(e.target.value)}
+        >
+          {months.map(m => (
+            <option key={m} value={m}>
+              {new Date(m + '-02').toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* SUMMARY STRIP — only shown when at least one limit is set */}

@@ -70,6 +70,19 @@
   font-weight: 500;
   color: var(--bg-muted);
 }
+.bg-month-select {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bg-muted);
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
 
 /* SUMMARY STRIP */
 .bg-summary {

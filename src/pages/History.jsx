@@ -12,7 +12,10 @@ function History() {
   const { expenses, loading } = useExpenses()
 
   const [filterCat, setFilterCat] = useState('All')
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [filterMonth, setFilterMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
   const [search, setSearch] = useState('')
   const [viewReceipt, setViewReceipt] = useState(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -41,7 +44,7 @@ function History() {
   const months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date()
     d.setMonth(d.getMonth() - i)
-    return d.toISOString().slice(0, 7)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
 
   // ── EXPORT ──
