@@ -145,7 +145,7 @@ function Dashboard() {
             onClick={() => handleCatClick(cat.name)}
             style={{ '--pill-color': COLORS[cat.name] || '#9ca3af' }}
           >
-            <div className="cat-pill-icon">
+            <div className="cat-pill-icon" style={{ background: (COLORS[cat.name] || '#9ca3af') + '30', color: COLORS[cat.name] || '#9ca3af' }}>
               {CATEGORY_ICONS[cat.name] || '📦'}
             </div>
             <div className="cat-pill-name">{cat.name}</div>
