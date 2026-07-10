@@ -109,6 +109,11 @@ function Dashboard() {
               innerRadius={65}
               outerRadius={90}
               strokeWidth={0}
+              onClick={(entry) => {
+                if (!entry?.name || entry.name === 'Empty') return
+                setSelectedCategory(prev => prev === entry.name ? null : entry.name)
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {pieData.length > 0
                 ? pieData.map(entry => (

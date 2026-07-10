@@ -64,6 +64,7 @@
 }
 
 /* DONUT */
+.donut-wrap *:focus { outline: none; }
 .donut-wrap {
   position: relative;
   width: 100%;
@@ -184,6 +185,7 @@
   border-radius: 16px;
   padding: 14px 8px 8px;
 }
+.trend-chart-wrap *:focus { outline: none; }
 
 /* RECENT */
 .recent-section {
